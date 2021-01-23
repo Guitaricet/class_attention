@@ -1,0 +1,7 @@
+numpy
+torch~=1.7.1
+transformers
+tokenizers==0.10
+wandb~=0.10.14
+matplotlib
+pytest
