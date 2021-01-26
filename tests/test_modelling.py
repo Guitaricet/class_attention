@@ -29,7 +29,7 @@ def model():
 
 def test_forward_random_input(model):
     x = torch.randint(0, 100, size=[3, 5])
-    c = torch.randint(0, 50, size=[7, 1])
+    c = torch.unique(torch.randint(0, 50, size=[7, 1])).unsqueeze(1)
 
     x_dict = {'input_ids': x}
     c_dict = {'input_ids': c}

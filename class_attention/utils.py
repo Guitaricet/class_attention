@@ -1,5 +1,7 @@
+import random
 from collections import Counter
 
+import datasets
 import tokenizers
 import tokenizers.pre_tokenizers
 import tokenizers.normalizers
@@ -44,3 +46,30 @@ def make_whitespace_tokenizer(texts, max_vocab_size=10_000, unk_token="[UNK]", p
 
     tokenizer.pad_token_id = 0
     return tokenizer
+
+
+def sample_dataset(dataset, p):
+    """Samples a smaller version of a dataset.
+
+    Mainly used for debugging and testing.
+
+    Args:
+        dataset: datasets.arrow_dataset.Dataset object
+        p: float, 0 < p <= 1
+
+    Returns:
+        datasets.arrow_dataset.Dataset of size len(dataset) * p with random examples from the dataset
+        sampled without replacement
+    """
+    if not 0 < p <= 1:
+        raise ValueError(p)
+
+    dataset_len = len(dataset)
+    sample_size = int(p * dataset_len)
+
+    ids = random.sample(range(len(dataset)), sample_size)
+
+    # indexing actually creates dict with elements of len(ids), not a list
+    sampled_dataset_dict = dataset[ids]
+    sampled_dataset = datasets.arrow_dataset.Dataset.from_dict(sampled_dataset_dict)
+    return sampled_dataset
