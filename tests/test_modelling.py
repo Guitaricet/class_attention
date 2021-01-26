@@ -34,7 +34,7 @@ def test_forward_random_input(model):
     x_dict = {'input_ids': x}
     c_dict = {'input_ids': c}
 
-    out = model(text_input_dict=x_dict, classes_input_dict=c_dict)
+    out = model(x_dict, c_dict)
 
     assert out.shape == (3, 7)
 

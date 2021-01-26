@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import transformers
+from class_attention import modelling_utils
 
 
 class FcClassAttentionModel(nn.Module):
@@ -25,7 +25,8 @@ class FcClassAttentionModel(nn.Module):
                                    nn.Linear(hidden_size, hidden_size))
 
     def forward(self, text_input, labels_input):
-        _validate_inputs(text_input, labels_input)
+        text_input, labels_input = modelling_utils.maybe_format_inputs(text_input, labels_input)
+        modelling_utils.validate_inputs(text_input, labels_input)
 
         x = text_input['input_ids']
         c = labels_input['input_ids']
@@ -48,7 +49,7 @@ class EmbClassAttentionModel(nn.Module):
     def __init__(self, txt_encoder, n_classes, hidden_size, use_txt_out=True):
         super().__init__()
 
-        txt_encoder_h = get_output_dim(txt_encoder)
+        txt_encoder_h = modelling_utils.get_output_dim(txt_encoder)
 
         self.use_txt_out = use_txt_out
         if not use_txt_out:
@@ -81,7 +82,8 @@ class EmbClassAttentionModel(nn.Module):
             labels_input: dict with key input_ids
                 input_ids: LongTensor[n_classes, class_seq_len], a list of possible classes, each class described via text
         """
-        self._validate_inputs(text_input, labels_input)
+        text_input, labels_input = modelling_utils.maybe_format_inputs(text_input, labels_input)
+        modelling_utils.validate_inputs(text_input, labels_input)
 
         h_x = self.txt_encoder(**text_input)  # some tuple
         h_x = h_x[0]  # FloatTensor[bs, text_seq_len, hidden]
@@ -97,23 +99,6 @@ class EmbClassAttentionModel(nn.Module):
         scaling = h_c.size(-1) ** 0.5
         logits = (h_x @ h_c.T) / scaling  # [bs, n_classes]
         return logits
-
-    @staticmethod
-    def _validate_inputs(text_input_dict, classes_input_dict):
-        if not isinstance(text_input_dict, dict):
-            raise ValueError('text input should be a dict')
-        if not isinstance(classes_input_dict, dict):
-            raise ValueError('classes input should be a dict')
-
-        if classes_input_dict['input_ids'].shape[0] == 1:
-            raise RuntimeError(
-                'batch dimension of classes tensor is the number of possible classes and cannot be equal to one'
-            )
-
-        # check that labels_input does not have duplicated
-        unique_classes = torch.unique(classes_input_dict['input_ids'], dim=0)
-        if unique_classes.shape[0] != classes_input_dict['input_ids'].shape[0]:
-            raise ValueError('labels_input should only contain unique classes')
 
 
 class BertMockModel(nn.Module):
@@ -140,28 +125,3 @@ class BertMockModel(nn.Module):
         h = self.x_enc(x)
         h = h.unsqueeze(1)
         return (h,)  # following BERT interface
-
-
-def get_output_dim(model):
-    # it looks like Transformers changed this in some version
-    # config = model.config
-    # if isinstance(config, transformers.DistilBertConfig):
-    #     return config.hidden_size
-    return model.config.hidden_size
-
-
-def _validate_inputs(text_input_dict, labels_input_dict):
-    if not isinstance(text_input_dict, dict):
-        raise ValueError('text input should be a dict')
-    if not isinstance(labels_input_dict, dict):
-        raise ValueError('classes input should be a dict')
-
-    if labels_input_dict['input_ids'].shape[0] == 1:
-        raise RuntimeError(
-            'batch dimension of classes tensor is the number of possible classes and cannot be equal to one'
-        )
-
-    # check that labels_input does not have duplicated
-    unique_classes = torch.unique(labels_input_dict['input_ids'], dim=0)
-    if unique_classes.shape[0] != labels_input_dict['input_ids'].shape[0]:
-        raise ValueError('labels_input should only contain unique classes')
