@@ -32,6 +32,6 @@ def maybe_format_inputs(text_input, labels_input):
         text_input = {"input_ids": text_input}
 
     if isinstance(labels_input, torch.Tensor):
-        labels_input = {"labels_input": labels_input}
+        labels_input = {"input_ids": labels_input}
 
     return text_input, labels_input
