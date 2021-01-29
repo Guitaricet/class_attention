@@ -166,6 +166,9 @@ def evaluate_model_per_class(model, dataloader, device, labels_str, zeroshot_lab
     model = model.to(device)
     model.eval()
 
+    if not set(zeroshot_labels).issubset(labels_str):
+        raise ValueError("labels_str should include all labels")
+
     n_correct = 0
     n_total = 0
     label2n_correct = defaultdict(int)
@@ -196,7 +199,7 @@ def evaluate_model_per_class(model, dataloader, device, labels_str, zeroshot_lab
         "acc": n_correct / n_total,
     }
 
-    for label in label2n_expected.keys():
+    for label in labels_str:
         label_str = label
         p = label2n_correct[label] / (label2n_predicted[label] + 1e-7)
         r = label2n_correct[label] / (label2n_expected[label] + 1e-7)
