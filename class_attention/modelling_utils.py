@@ -12,19 +12,19 @@ def get_output_dim(model: transformers.PreTrainedModel):
 
 def validate_inputs(text_input_dict, labels_input_dict):
     if not isinstance(text_input_dict, dict):
-        raise ValueError('text input should be a dict')
+        raise ValueError("text input should be a dict")
     if not isinstance(labels_input_dict, dict):
-        raise ValueError('classes input should be a dict')
+        raise ValueError("classes input should be a dict")
 
-    if labels_input_dict['input_ids'].shape[0] == 1:
+    if labels_input_dict["input_ids"].shape[0] == 1:
         raise RuntimeError(
-            'batch dimension of classes tensor is the number of possible classes and cannot be equal to one'
+            "batch dimension of classes tensor is the number of possible classes and cannot be equal to one"
         )
 
     # check that labels_input does not have duplicated
-    unique_classes = torch.unique(labels_input_dict['input_ids'], dim=0)
-    if unique_classes.shape[0] != labels_input_dict['input_ids'].shape[0]:
-        raise ValueError('labels_input should only contain unique classes')
+    unique_classes = torch.unique(labels_input_dict["input_ids"], dim=0)
+    if unique_classes.shape[0] != labels_input_dict["input_ids"].shape[0]:
+        raise ValueError("labels_input should only contain unique classes")
 
 
 def maybe_format_inputs(text_input, labels_input):
@@ -35,3 +35,7 @@ def maybe_format_inputs(text_input, labels_input):
         labels_input = {"input_ids": labels_input}
 
     return text_input, labels_input
+
+
+def normalize_embeds(embeds):
+    return embeds / torch.sqrt(torch.sum(embeds * embeds, dim=1, keepdim=True))

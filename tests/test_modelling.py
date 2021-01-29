@@ -31,12 +31,12 @@ def test_forward_random_input(model):
     x = torch.randint(0, 100, size=[3, 5])
     c = torch.unique(torch.randint(0, 50, size=[7, 1])).unsqueeze(1)
 
-    x_dict = {'input_ids': x}
-    c_dict = {'input_ids': c}
+    x_dict = {"input_ids": x}
+    c_dict = {"input_ids": c}
 
     out = model(x_dict, c_dict)
 
-    assert out.shape == (3, 7)
+    assert out.shape == (3, c.shape[0])
 
 
 def test_forward(model):
@@ -46,7 +46,7 @@ def test_forward(model):
         [101, 6148, 17633, 2543, 1999, 1996, 7579, 102,     0,   0],
     ])}
 
-    # c_dict is not labels of the x_dict, these are all possible labels
+    # c_dict is not classes of the x_dict, these are all possible classes
     c_dict = {"input_ids": torch.LongTensor([[41], [13], [12]])}
     # fmt: on
 

@@ -17,9 +17,9 @@ class CatDataset(torch.utils.data.Dataset):
 
     def __init__(self, texts, text_tokenizer, labels=None, label_tokenizer=None):
         if labels is not None and len(texts) != len(labels):
-            raise ValueError("labels and texts should have the same number of elements")
+            raise ValueError("classes and texts should have the same number of elements")
         if labels is not None and label_tokenizer is None:
-            raise ValueError("label_tokenizer should be provided with teh labels")
+            raise ValueError("label_tokenizer should be provided with teh classes")
 
         self.texts = texts
         self.text_tokenizer = text_tokenizer
@@ -40,12 +40,12 @@ class CatDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         """Turn the text at index idx into count vector
 
-        and return it along the corresponding label (if labels were provided to the __init__)
+        and return it along the corresponding label (if classes were provided to the __init__)
 
         Returns:
             torch.Tensor[text_len,], torch.Tensor[class_len,] - count vector and (optionally) a label
 
-            if the labels were not provided
+            if the classes were not provided
         """
 
         vector = self._text_ids[idx]

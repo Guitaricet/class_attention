@@ -48,6 +48,9 @@ class ClassAttentionModel(nn.Module):
         h_x = self.txt_out(h_x)
         h_c = self.cls_out(h_c)
 
+        # make all class embeddings to have the same Euclidean norm
+        h_c = modelling_utils.normalize_embeds(h_c)
+
         # the scaling is extremely important
         scaling = h_c.size(-1) ** 0.5
         logits = (h_x @ h_c.T) / scaling  # [bs, n_classes]

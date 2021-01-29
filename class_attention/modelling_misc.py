@@ -13,23 +13,26 @@ class FcClassAttentionModel(nn.Module):
     """
     Class attention that uses fully-connected networks to encode both text and label
     """
+
     def __init__(self, text_vocab_size, n_classes, hidden_size):
         super().__init__()
 
-        self.x_enc = nn.Sequential(nn.EmbeddingBag(text_vocab_size, hidden_size),
-                                   nn.ReLU(),
-                                   nn.Linear(hidden_size, hidden_size))
+        self.x_enc = nn.Sequential(
+            nn.EmbeddingBag(text_vocab_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+        )
 
-        self.c_enc = nn.Sequential(nn.EmbeddingBag(n_classes, hidden_size),
-                                   nn.ReLU(),
-                                   nn.Linear(hidden_size, hidden_size))
+        self.c_enc = nn.Sequential(
+            nn.EmbeddingBag(n_classes, hidden_size), nn.ReLU(), nn.Linear(hidden_size, hidden_size)
+        )
 
     def forward(self, text_input, labels_input):
         text_input, labels_input = modelling_utils.maybe_format_inputs(text_input, labels_input)
         modelling_utils.validate_inputs(text_input, labels_input)
 
-        x = text_input['input_ids']
-        c = labels_input['input_ids']
+        x = text_input["input_ids"]
+        c = labels_input["input_ids"]
 
         h_x = self.x_enc(x)
         h_c = self.c_enc(c)
@@ -55,7 +58,8 @@ class EmbClassAttentionModel(nn.Module):
         if not use_txt_out:
             if hidden_size != txt_encoder_h:
                 raise ValueError(
-                    "hidden_size should be equal to the hidden size of the text encoder if use_txt_out=False")
+                    "hidden_size should be equal to the hidden size of the text encoder if use_txt_out=False"
+                )
 
         self.txt_encoder = txt_encoder
 
@@ -63,9 +67,7 @@ class EmbClassAttentionModel(nn.Module):
             self.txt_out = nn.Linear(txt_encoder_h, hidden_size)
 
         self.cls_encoder = nn.Sequential(
-            nn.EmbeddingBag(n_classes, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size)
+            nn.EmbeddingBag(n_classes, hidden_size), nn.ReLU(), nn.Linear(hidden_size, hidden_size)
         )
 
     def forward(self, text_input, labels_input):
@@ -90,7 +92,7 @@ class EmbClassAttentionModel(nn.Module):
         h_x = h_x[:, 0]  # get CLS token representations, FloatTensor[bs, hidden]
         #         h_x, _ = torch.max(h_x, axis=1)
 
-        c = labels_input['input_ids']
+        c = labels_input["input_ids"]
         h_c = self.cls_encoder(c)  # FloatTensor[n_classes, hidden]
 
         if self.use_txt_out:
@@ -110,9 +112,11 @@ class BertMockModel(nn.Module):
 
     def __init__(self, vocab_size, hidden_size):
         super().__init__()
-        self.x_enc = nn.Sequential(nn.EmbeddingBag(vocab_size, hidden_size),
-                                   nn.ReLU(),
-                                   nn.Linear(hidden_size, hidden_size))
+        self.x_enc = nn.Sequential(
+            nn.EmbeddingBag(vocab_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+        )
 
         class MockConfig:
             def __init__(self, hidden_size):
