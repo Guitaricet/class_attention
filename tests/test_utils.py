@@ -58,11 +58,7 @@ def test_validate_model_on_dataloader(random_model, dataloader):
 def test_valiadte_model_per_class_on_dataloader(random_model, dataloader):
     labels = ["My News", "Weather", "Sport"]
     metrics = _acc = cat.utils.evaluate_model_per_class(
-        random_model,
-        dataloader,
-        device="cpu",
-        labels_str=labels,
-        zeroshot_labels=["My News"]
+        random_model, dataloader, device="cpu", labels_str=labels, zeroshot_labels=["My News"]
     )
 
     at_least_one = False

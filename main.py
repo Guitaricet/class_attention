@@ -53,10 +53,13 @@ def parse_args(args=None):
     return args
 
 
-def prepare_dataloaders(text_class_frac, dataset_frac):
-    reduced_train_set, test_set, all_classes_str, test_classes_str = cat.training_utils.prepare_dataset(
-        text_class_frac, dataset_frac
-    )
+def prepare_dataloaders(text_class_frac, dataset_frac, num_workers=8):
+    (
+        reduced_train_set,
+        test_set,
+        all_classes_str,
+        test_classes_str,
+    ) = cat.training_utils.prepare_dataset(text_class_frac, dataset_frac)
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL, fast=True)
     label_tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL, fast=True)
@@ -77,7 +80,10 @@ def prepare_dataloaders(text_class_frac, dataset_frac):
 
     # Dataloaders
     all_classes_ids = label_tokenizer.batch_encode_plus(
-        all_classes_str, return_tensors="pt", add_special_tokens=True, padding=True,
+        all_classes_str,
+        return_tensors="pt",
+        add_special_tokens=True,
+        padding=True,
     )["input_ids"]
 
     train_collator = cat.CatCollator(pad_token_id=label_tokenizer.pad_token_id)
@@ -86,10 +92,16 @@ def prepare_dataloaders(text_class_frac, dataset_frac):
     )
 
     train_dataloader = torch.utils.data.DataLoader(
-        reduced_train_dataset, batch_size=args.batch_size, collate_fn=train_collator
+        reduced_train_dataset,
+        batch_size=args.batch_size,
+        collate_fn=train_collator,
+        num_workers=num_workers,
     )
     test_dataloader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=args.batch_size, collate_fn=test_collator
+        test_dataset,
+        batch_size=args.batch_size,
+        collate_fn=test_collator,
+        num_workers=num_workers,
     )
     return train_dataloader, test_dataloader, all_classes_str, test_classes_str
 
