@@ -114,8 +114,8 @@ class ClassAttentionModel(nn.Module):
 
         if wandb.run is not None:
             wandb.log({
-                "train/temperature": self.temperature,
-                "train/exp_temperature": torch.exp(self.temperature),
+                "train/temperature": self.temperature.data,
+                "train/exp_temperature": torch.exp(self.temperature.data),
             })
 
         return logits

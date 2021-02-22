@@ -113,6 +113,12 @@ def split_classes(
 
         test_classes = random.sample(all_classes, k=n_test_classes)
 
+    if p_test_classes == 0:
+        if test_classes is not None:
+            raise ValueError("test classes should not be specified if p_test_classes=0")
+
+        test_classes = set()
+
     if verbose:
         print(f"Moving the following classes to a class-test set: {test_classes}")
 
