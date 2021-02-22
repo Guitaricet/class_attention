@@ -1,10 +1,8 @@
-import re
 import pytest
 
 import torch
 import torch.utils.data
 import transformers
-import datasets
 
 import class_attention as cat
 
@@ -23,6 +21,7 @@ def random_model():
 
     return random_model
 
+
 @pytest.fixture()
 def train_texts():
     # fmt: off
@@ -35,9 +34,11 @@ def train_texts():
     # fmt: on
     return train_texts
 
+
 @pytest.fixture()
 def train_labels():
     return ["News", "News", "Weather", "Sport"]
+
 
 @pytest.fixture()
 def possible_labels_str():
@@ -88,16 +89,13 @@ def test_accuracy_consistency(random_model, dataloader, possible_labels_str):
     assert _acc_simple == all_metrics["acc"]
 
 
-def test_training(random_model, dataloader, possible_labels_str):
-    optimizer = torch.optim.Adam(random_model.get_trainable_parameters(), lr=1e-4)
+def test_split_classes_no_zero_shot(dataloader):
+    dataset = dataloader.dataset
 
-    cat.training_utils.train_cat_model(
-        model=random_model,
-        optimizer=optimizer,
-        train_dataloader=dataloader,
-        test_dataloader=dataloader,
-        all_classes_str=possible_labels_str,
-        test_classes_str=possible_labels_str,
-        max_epochs=3,
-        device="cpu",
+    cat.utils.split_classes(
+        dataset,
+        p_test_classes=0,
+        test_classes=None,
+        class_field_name="category",
+        verbose=False,
     )

@@ -81,9 +81,9 @@ def remove_smallest_principial_component(vecs, remove_n=1):
 def get_small_transformer():
     return transformers.AutoModel.from_config(
         transformers.BertConfig(
-            hidden_size=32,
+            hidden_size=8,
             num_hidden_layers=2,
-            intermediate_size=64,
-            num_attention_heads=4,
+            intermediate_size=16,
+            num_attention_heads=2,
         )
     )

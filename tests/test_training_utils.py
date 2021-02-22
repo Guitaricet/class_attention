@@ -7,13 +7,12 @@ import class_attention as cat
 
 def test_prepare_dataset():
     reduced_train_set, test_set, all_classes, test_classes = cat.training_utils.prepare_dataset(
-        test_class_frac=0.1, dataset_frac=1.0
+        test_class_frac=0.1, dataset_frac=0.001,
     )
 
     assert set(test_classes).issubset(set(all_classes))
     assert set(test_classes) != set(all_classes)
     assert set(test_classes).issubset(set(test_set["category"]))
-    assert set(test_set["category"]) == set(all_classes)
 
 
 def test_prepare_dataloaders():
@@ -35,3 +34,34 @@ def test_prepare_dataloaders():
     assert isinstance(all_classes_str[0], str)
     assert isinstance(test_classes_str[0], str)
     assert set(all_classes_str).issuperset(set(test_classes_str))
+
+
+def test_training_pipeline():
+    # this test becomes VERY slow if num_workers > 0
+    (
+        train_dataloader,
+        test_dataloader,
+        all_classes_str,
+        test_classes_str,
+    ) = cat.training_utils.prepare_dataloaders(
+        test_class_frac=0.2, batch_size=8, model_name="distilbert-base-uncased", dataset_frac=0.001, num_workers=0,
+    )
+
+    text_encoder = cat.modelling_utils.get_small_transformer()
+    label_encoder = cat.modelling_utils.get_small_transformer()
+    model = cat.ClassAttentionModel(
+        text_encoder,
+        label_encoder,
+    )
+    optimizer = torch.optim.Adam(model.get_trainable_parameters(), lr=1e-4)
+
+    cat.training_utils.train_cat_model(
+        model=model,
+        optimizer=optimizer,
+        train_dataloader=train_dataloader,
+        test_dataloader=test_dataloader,
+        all_classes_str=all_classes_str,
+        test_classes_str=test_classes_str,
+        max_epochs=3,
+        device="cpu",
+    )

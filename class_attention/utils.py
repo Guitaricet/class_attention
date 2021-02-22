@@ -108,14 +108,20 @@ def split_classes(
         where both objects are ArrowDataset and all test classes are moved to class_test_set
     """
 
-    if not (p_test_classes is None) ^ (test_classes is None):
+    if not ((p_test_classes is None) ^ (test_classes is None)):
         raise ValueError(
             "Only one of p_test_classes or test_classes should be specified. "
             f"Got p_test_classes = {p_test_classes}\n"
             f"test_classes = {test_classes}"
         )
 
-    if p_test_classes is not None and p_test_classes > 0:
+    if p_test_classes == 0:
+        if test_classes is not None:
+            raise ValueError("test classes should not be specified if p_test_classes=0")
+
+        return dataset, None
+
+    if p_test_classes is not None:
         all_classes = list(set(dataset[class_field_name]))
         n_test_classes = int(len(all_classes) * p_test_classes)
         if n_test_classes == 0:
@@ -124,12 +130,6 @@ def split_classes(
             )
 
         test_classes = random.sample(all_classes, k=n_test_classes)
-
-    if p_test_classes == 0:
-        if test_classes is not None:
-            raise ValueError("test classes should not be specified if p_test_classes=0")
-
-        test_classes = set()
 
     if verbose:
         print(f"Moving the following classes to a class-test set: {test_classes}")

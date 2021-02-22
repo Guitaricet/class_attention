@@ -26,26 +26,34 @@ def prepare_dataset(test_class_frac, dataset_frac=1.0):
     news_dataset = datasets.load_dataset("Fraser/news-category-dataset")
     train_set = news_dataset["train"]
     test_set = news_dataset["validation"]
-    all_classes = list(set(news_dataset["train"]["category"]))
 
     if dataset_frac < 1:
-        # some magic is happening here to make a toy dataset that is consistent, read carefully
-        train_set = cat.utils.sample_dataset(news_dataset["train"], p=dataset_frac)
-
-        classes_left = list(set(train_set["category"]))
-
-        test_set = news_dataset["validation"]
-        if len(all_classes) > len(classes_left):
-            _, test_set = cat.utils.split_classes(test_set)
-
+        # sample from the train set and the test set
+        train_set = cat.utils.sample_dataset(train_set, p=dataset_frac)
         test_set = cat.utils.sample_dataset(test_set, p=dataset_frac)
+
+        _train_classes = set(train_set["category"])
+        _test_classes = set(test_set["category"])
+
+        # check that there are still multiple training classes left
+        if len(_train_classes) < 2:
+            raise ValueError(f"Sampling size is too small for the *training* set, only {len(_train_classes)} left")
+
+        if len(_test_classes) < 2:
+            raise ValueError(f"Sampling size is too small for the *test* set, only {len(_test_classes)} left")
 
     reduced_train_set, _train_set_remainder = cat.utils.split_classes(
         train_set, p_test_classes=test_class_frac, verbose=True
     )
-    test_classes = list(set(_train_set_remainder["category"]))
 
-    return reduced_train_set, test_set, all_classes, test_classes
+    train_classes = set(reduced_train_set["category"])
+    test_classes = set(test_set["category"])
+
+    # do not move this code above the IF statement as it may change all_classes
+    all_classes = (train_classes | test_classes)
+    zero_shot_classes = test_classes.difference(train_classes)
+
+    return reduced_train_set, test_set, list(all_classes), list(zero_shot_classes)
 
 
 def prepare_dataloaders(test_class_frac, batch_size, model_name, dataset_frac=1.0, num_workers=8):
@@ -71,7 +79,7 @@ def prepare_dataloaders(test_class_frac, batch_size, model_name, dataset_frac=1.
         test_set,
         all_classes_str,
         test_classes_str,
-    ) = cat.training_utils.prepare_dataset(test_class_frac, dataset_frac)
+    ) = prepare_dataset(test_class_frac, dataset_frac)
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
     label_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
@@ -135,6 +143,10 @@ def train_cat_model(
 
     for epoch in tqdm(range(max_epochs), desc="Epochs"):
         for x, c, y in train_dataloader:
+            if c.shape[0] == 1:
+                logger.warning("Number of possible classes is 1, skipping this batch")
+                continue
+
             global_step += 1
             optimizer.zero_grad()
 
