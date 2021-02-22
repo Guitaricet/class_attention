@@ -103,7 +103,7 @@ def split_classes(
             f"test_classes = {test_classes}"
         )
 
-    if p_test_classes is not None:
+    if p_test_classes is not None and p_test_classes > 0:
         all_classes = list(set(dataset[class_field_name]))
         n_test_classes = int(len(all_classes) * p_test_classes)
         if n_test_classes == 0:
