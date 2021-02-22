@@ -12,8 +12,6 @@ import torch.nn.functional as F
 import transformers
 import wandb
 
-from tqdm import tqdm
-
 import class_attention as cat
 
 
@@ -95,7 +93,9 @@ def main(args):
         test_dataloader,
         all_classes_str,
         test_classes_str,
-    ) = cat.training_utils.prepare_dataloaders(args.test_class_frac, args.batch_size, args.model, args.dataset_frac)
+    ) = cat.training_utils.prepare_dataloaders(
+        args.test_class_frac, args.batch_size, args.model, args.dataset_frac
+    )
     wandb.config.test_classes = ",".join(sorted(test_classes_str))
 
     # Model
@@ -127,50 +127,22 @@ def main(args):
         with os.fdopen(tmp_file, "w") as f:
             f.write(repr(model))
         wandb.save(path)
+        logger.info("Uploaded model description to wandb")
     finally:
         os.remove(path)
 
-    global_step = -1
+    logger.info("Starting training")
 
-    for epoch in tqdm(range(args.max_epochs), desc="Epochs"):
-        for x, c, y in train_dataloader:
-            global_step += 1
-            optimizer.zero_grad()
-
-            x = x.to(args.device)
-            c = c.to(args.device)
-            y = y.to(args.device)
-
-            x_dict = {"input_ids": x}
-            c_dict = {"input_ids": c}
-            logits = model(x_dict, c_dict)  # [batch_size, n_classes]
-
-            loss = F.cross_entropy(logits, y)
-
-            _, preds = logits.max(-1)
-            acc = torch.sum(preds == y).float() / x.shape[0]
-
-            # fmt: off
-            wandb.log({
-                "train/acc": acc,
-                "train/loss": loss,
-                "train/epoch": epoch,
-                "global_step": global_step,
-            })
-            # fmt: on
-
-            loss.backward()
-            optimizer.step()
-
-        # validation
-        metrics = cat.utils.evaluate_model_per_class(
-            model,
-            test_dataloader,
-            device=args.device,
-            labels_str=all_classes_str,
-            zeroshot_labels=test_classes_str,
-        )
-        wandb.log({f"eval/{k}": v for k, v in metrics.items()})
+    cat.training_utils.train_cat_model(
+        model,
+        optimizer,
+        train_dataloader,
+        test_dataloader,
+        all_classes_str,
+        test_classes_str,
+        args.max_epochs,
+        args.device,
+    )
 
     logger.info("Script finished successfully")
 

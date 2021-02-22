@@ -23,10 +23,7 @@ def test_prepare_dataloaders():
         all_classes_str,
         test_classes_str,
     ) = cat.training_utils.prepare_dataloaders(
-        test_class_frac=0.2,
-        batch_size=32,
-        model_name="distilbert-base-uncased",
-        dataset_frac=0.1
+        test_class_frac=0.2, batch_size=32, model_name="distilbert-base-uncased", dataset_frac=0.1
     )
 
     assert isinstance(train_dataloader, torch.utils.data.DataLoader)

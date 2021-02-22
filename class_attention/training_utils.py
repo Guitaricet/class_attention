@@ -1,9 +1,25 @@
+import logging
+import os
+import sys
+
 import torch
+import torch.nn.functional as F
 
 import datasets
 import transformers
+import wandb
+from tqdm.auto import tqdm
 
 import class_attention as cat
+
+
+logging.basicConfig(
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO,
+    stream=sys.stdout,
+)
+logger = logging.getLogger(os.path.basename(__file__))
 
 
 def prepare_dataset(test_class_frac, dataset_frac=1.0):
@@ -100,3 +116,67 @@ def prepare_dataloaders(test_class_frac, batch_size, model_name, dataset_frac=1.
         num_workers=num_workers,
     )
     return train_dataloader, test_dataloader, all_classes_str, test_classes_str
+
+
+def train_cat_model(
+    model,
+    optimizer,
+    train_dataloader,
+    test_dataloader,
+    all_classes_str,
+    test_classes_str,
+    max_epochs,
+    device=None,
+):
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    global_step = -1
+
+    for epoch in tqdm(range(max_epochs), desc="Epochs"):
+        for x, c, y in train_dataloader:
+            global_step += 1
+            optimizer.zero_grad()
+
+            x = x.to(device)
+            c = c.to(device)
+            y = y.to(device)
+
+            x_dict = {"input_ids": x}
+            c_dict = {"input_ids": c}
+            logits = model(x_dict, c_dict)  # [batch_size, n_classes]
+
+            loss = F.cross_entropy(logits, y)
+            # if args.double_loss:
+            # similar to CLIP cross_entropy_loss(..., axis=0)
+            # TODO: average text vectors with the same class
+            # then compute the transposed cross entropy
+
+            _, preds = logits.max(-1)
+            acc = torch.sum(preds == y).float() / x.shape[0]
+
+            # fmt: off
+            if wandb.run is not None:
+                wandb.log({
+                    "train/acc": acc,
+                    "train/loss": loss,
+                    "train/epoch": epoch,
+                    "global_step": global_step,
+                })
+            # fmt: on
+
+            loss.backward()
+            optimizer.step()
+
+        # validation
+        metrics = cat.utils.evaluate_model_per_class(
+            model,
+            test_dataloader,
+            device=device,
+            labels_str=all_classes_str,
+            zeroshot_labels=test_classes_str,
+        )
+        if wandb.run is not None:
+            wandb.log({f"eval/{k}": v for k, v in metrics.items()})
+
+    return model

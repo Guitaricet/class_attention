@@ -112,11 +112,13 @@ class ClassAttentionModel(nn.Module):
         self.temperature.data.clamp_(math.log(1e-3), math.log(1e3))
         logits *= torch.exp(self.temperature)
 
+        # fmt: off
         if wandb.run is not None:
             wandb.log({
                 "train/temperature": self.temperature.data,
                 "train/exp_temperature": torch.exp(self.temperature.data),
             })
+        # fmt: on
 
         return logits
 
@@ -135,8 +137,10 @@ class ClassAttentionModel(nn.Module):
                 raise ValueError("hidden size should be specified with use_n_projection_layers")
 
         if kwargs.get("share_txt_cls_network_params") and kwargs.get("freeze_cls_network"):
-            raise ValueError("Parameters are shared, but class network is not trained. "
-                             "Both BERT bodies not being updated")
+            raise ValueError(
+                "Parameters are shared, but class network is not trained. "
+                "Both BERT bodies not being updated"
+            )
 
     def make_bahdanau_attention(self, kwargs):
         if kwargs.get("use_n_projection_layers") is not None:
@@ -161,7 +165,11 @@ class ClassAttentionModel(nn.Module):
         if self.kwargs.get("freeze_cls_network"):
             conditions.append(self._is_not_cls_network)
 
-        return (param for name, param in self.named_parameters() if all(cond(name) for cond in conditions))
+        return (
+            param
+            for name, param in self.named_parameters()
+            if all(cond(name) for cond in conditions)
+        )
 
     @staticmethod
     def _is_not_proj(param_name):

@@ -70,9 +70,9 @@ def remove_smallest_principial_component(vecs, remove_n=1):
     S is a list of singular values, sorted descending.
     """
     U, S, V = torch.pca_lowrank(vecs)
-    S_r = S[:-remove_n - 1]
-    U_r = U[:, :-remove_n - 1]
-    V_r = V[:, :-remove_n - 1]
+    S_r = S[: -remove_n - 1]
+    U_r = U[:, : -remove_n - 1]
+    V_r = V[:, : -remove_n - 1]
 
     A_r = U_r @ torch.diag(S_r) @ V_r.T
     return A_r

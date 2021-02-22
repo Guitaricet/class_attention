@@ -1,4 +1,7 @@
+import logging
+import os
 import random
+import sys
 from collections import Counter, defaultdict
 
 import torch
@@ -7,6 +10,15 @@ import tokenizers
 import tokenizers.pre_tokenizers
 import tokenizers.normalizers
 from tokenizers.models import WordLevel
+
+
+logging.basicConfig(
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO,
+    stream=sys.stdout,
+)
+logger = logging.getLogger(os.path.basename(__file__))
 
 
 def make_whitespace_tokenizer(texts, max_vocab_size=10_000, unk_token="[UNK]", pad_token="[PAD]"):
@@ -172,7 +184,7 @@ def evaluate_model_per_class(model, dataloader, device, labels_str, zeroshot_lab
     model = model.to(device)
     model.eval()
 
-    if not set(zeroshot_labels).issubset(labels_str):
+    if zeroshot_labels is not None and (not set(zeroshot_labels).issubset(labels_str)):
         raise ValueError("labels_str should include all labels")
 
     n_correct = 0
@@ -252,6 +264,10 @@ def _aggregate_metrics_by_class_group(metrics, class_group, suffix):
 
     for metric in ["R", "P", "F1"]:
         class_group_metrics = [metrics[f"{metric}/{c}"] for c in class_group]
+        if len(class_group_metrics) == 0:
+            logger.warning(f"No classes for the group {class_group}")
+            continue
+
         metric_value = sum(class_group_metrics) / len(class_group_metrics)
         res[f"{metric}_{suffix}"] = metric_value
 

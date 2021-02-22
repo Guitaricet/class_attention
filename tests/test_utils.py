@@ -23,9 +23,8 @@ def random_model():
 
     return random_model
 
-
 @pytest.fixture()
-def dataloader():
+def train_texts():
     # fmt: off
     train_texts = [
         "This is a news article",
@@ -33,15 +32,25 @@ def dataloader():
         "It is cloudy with a chance of meatballs",
         "This is a sport article",
     ]
-    train_labels = ["News", "News", "Weather", "Sport"]
     # fmt: on
+    return train_texts
 
+@pytest.fixture()
+def train_labels():
+    return ["News", "News", "Weather", "Sport"]
+
+@pytest.fixture()
+def possible_labels_str():
+    return ["News", "Weather", "Sport"]
+
+
+@pytest.fixture()
+def dataloader(train_texts, train_labels, possible_labels_str):
     text_tokenizer = cat.utils.make_whitespace_tokenizer(train_texts)
     label_tokenizer = cat.utils.make_whitespace_tokenizer(train_labels, unk_token=None)
 
     dataset = cat.CatDataset(train_texts, text_tokenizer, train_labels, label_tokenizer)
 
-    possible_labels_str = ["News", "Weather", "Sport"]
     possible_labels_ids = torch.LongTensor(
         [label_tokenizer.encode(l).ids for l in possible_labels_str]
     )
@@ -71,3 +80,24 @@ def test_valiadte_model_per_class_on_dataloader(random_model, dataloader):
                 at_least_one = True
 
     assert at_least_one, "all metrics are either 0 or 1"
+
+
+def test_accuracy_consistency(random_model, dataloader, possible_labels_str):
+    _acc_simple = cat.utils.evaluate_model(random_model, dataloader, device="cpu")
+    all_metrics = cat.utils.evaluate_model_per_class(random_model, dataloader, device="cpu", labels_str=possible_labels_str)
+    assert _acc_simple == all_metrics["acc"]
+
+
+def test_training(random_model, dataloader, possible_labels_str):
+    optimizer = torch.optim.Adam(random_model.get_trainable_parameters(), lr=1e-4)
+
+    cat.training_utils.train_cat_model(
+        model=random_model,
+        optimizer=optimizer,
+        train_dataloader=dataloader,
+        test_dataloader=dataloader,
+        all_classes_str=possible_labels_str,
+        test_classes_str=possible_labels_str,
+        max_epochs=3,
+        device="cpu",
+    )
