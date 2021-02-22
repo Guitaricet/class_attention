@@ -2,6 +2,7 @@ import math
 
 import torch
 import torch.nn as nn
+import wandb
 
 from class_attention import modelling_utils
 from class_attention.modelling_misc import IdentityLayer
@@ -110,6 +111,10 @@ class ClassAttentionModel(nn.Module):
         # apply temperature
         self.temperature.data.clamp_(math.log(1e-3), math.log(1e3))
         logits *= torch.exp(self.temperature)
+
+        if wandb.run is not None:
+            wandb.log("train/temperature", self.temperature)
+            wandb.log("train/exp_temperature", torch.exp(self.temperature))
 
         return logits
 

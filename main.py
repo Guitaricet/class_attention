@@ -119,9 +119,11 @@ def main(args):
 
     logger.info("Starting training")
     wandb.watch(model, log="all")
+    global_step = -1
 
-    for _ in tqdm(range(args.max_epochs), desc="Epochs"):
+    for epoch in tqdm(range(args.max_epochs), desc="Epochs"):
         for x, c, y in train_dataloader:
+            global_step += 1
             optimizer.zero_grad()
 
             x = x.to(args.device)
@@ -141,6 +143,8 @@ def main(args):
             wandb.log({
                 "train/acc": acc,
                 "train/loss": loss,
+                "train/epoch": epoch,
+                "global_step": global_step,
             })
             # fmt: on
 
