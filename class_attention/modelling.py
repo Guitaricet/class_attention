@@ -1,19 +1,10 @@
 import math
-from itertools import chain
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from class_attention import modelling_utils
-
-
-class IdentityLayer:
-    def __call__(self, x):
-        return x
-
-    def parameters(self):
-        return []
+from class_attention.modelling_misc import IdentityLayer
 
 
 class ClassAttentionModel(nn.Module):
@@ -64,8 +55,9 @@ class ClassAttentionModel(nn.Module):
         if kwargs.get("attention_type") == "bahdanau":
             self.bahdanau_network = self.make_bahdanau_attention(kwargs)
 
+        initial_temperature = kwargs.get("temperature", 0)
         self.temperature = nn.Parameter(
-            torch.tensor(1.0, requires_grad=kwargs.get("learn_temperature", False))
+            torch.tensor(initial_temperature, requires_grad=kwargs.get("learn_temperature", False))
         )
 
     def forward(self, text_input, labels_input):

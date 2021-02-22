@@ -46,6 +46,8 @@ def parse_args(args=None):
     parser.add_argument("--normalize-cls", default=False, action="store_true")
     parser.add_argument("--scale-attention", default=False, action="store_true",
                         help="we recommend to use scaling if normalization is not used")
+    parser.add_argument("--temperature", default=0., type=float,
+                        help="softmax temperature (used as the initial value if --learn-temperature")
     parser.add_argument("--learn-temperature", default=False, action="store_true",
                         help="learn the softmax temperature as an additional scalar parameter")
     parser.add_argument("--remove-n-lowest-pc", default=0, type=int,
@@ -116,7 +118,7 @@ def main(args):
     optimizer = torch.optim.Adam(parameters, lr=args.lr)
 
     logger.info("Starting training")
-    wandb.watch(model)
+    wandb.watch(model, log="all")
 
     for _ in tqdm(range(args.max_epochs), desc="Epochs"):
         for x, c, y in train_dataloader:
@@ -128,7 +130,7 @@ def main(args):
 
             x_dict = {"input_ids": x}
             c_dict = {"input_ids": c}
-            logits = model(x_dict, c_dict)
+            logits = model(x_dict, c_dict)  # [batch_size, n_classes]
 
             loss = F.cross_entropy(logits, y)
 

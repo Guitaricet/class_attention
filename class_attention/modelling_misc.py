@@ -129,3 +129,11 @@ class BertMockModel(nn.Module):
         h = self.x_enc(x)
         h = h.unsqueeze(1)
         return (h,)  # following BERT interface
+
+
+class IdentityLayer:
+    def __call__(self, x):
+        return x
+
+    def parameters(self):
+        return []
