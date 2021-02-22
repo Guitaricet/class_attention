@@ -56,7 +56,7 @@ class ClassAttentionModel(nn.Module):
         if kwargs.get("attention_type") == "bahdanau":
             self.bahdanau_network = self.make_bahdanau_attention(kwargs)
 
-        initial_temperature = kwargs.get("temperature", 0)
+        initial_temperature = kwargs.get("temperature", 0.)
         self.temperature = nn.Parameter(
             torch.tensor(initial_temperature, requires_grad=kwargs.get("learn_temperature", False))
         )
