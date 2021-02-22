@@ -3,6 +3,7 @@ import logging
 import pprint
 import os
 import sys
+import tempfile
 from itertools import chain
 
 import torch
@@ -119,6 +120,16 @@ def main(args):
 
     logger.info("Starting training")
     wandb.watch(model, log="all")
+
+    # source: https://stackoverflow.com/questions/8577137/how-can-i-create-a-tmp-file-in-python/8577225
+    tmp_file, path = tempfile.mkstemp(prefix="model_arch", text=True)
+    try:
+        with os.fdopen(tmp_file, "w") as f:
+            f.write(repr(model))
+        wandb.save(path)
+    finally:
+        os.remove(path)
+
     global_step = -1
 
     for epoch in tqdm(range(args.max_epochs), desc="Epochs"):
