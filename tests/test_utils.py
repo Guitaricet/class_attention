@@ -92,10 +92,12 @@ def test_accuracy_consistency(random_model, dataloader, possible_labels_str):
 def test_split_classes_no_zero_shot(dataloader):
     dataset = dataloader.dataset
 
-    cat.utils.split_classes(
+    train_dataset, test_dataset = cat.utils.split_classes(
         dataset,
         p_test_classes=0,
         test_classes=None,
         class_field_name="category",
         verbose=False,
     )
+
+    assert test_dataset is None

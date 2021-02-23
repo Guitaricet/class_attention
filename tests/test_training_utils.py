@@ -13,6 +13,8 @@ def test_prepare_dataset():
     assert set(test_classes).issubset(set(all_classes))
     assert set(test_classes) != set(all_classes)
     assert set(test_classes).issubset(set(test_set["category"]))
+    assert len(set(test_classes).intersection(set(reduced_train_set["category"]))) == 0,\
+        "train dataset should not contain test classes"
 
 
 def test_prepare_dataloaders():

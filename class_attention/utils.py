@@ -11,6 +11,8 @@ import tokenizers.pre_tokenizers
 import tokenizers.normalizers
 from tokenizers.models import WordLevel
 
+from tqdm.auto import tqdm
+
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -176,7 +178,7 @@ def evaluate_model(model, dataloader, device):
     return acc
 
 
-def evaluate_model_per_class(model, dataloader, device, labels_str, zeroshot_labels=None):
+def evaluate_model_per_class(model, dataloader, device, labels_str, zeroshot_labels=None, progress_bar=False):
     """
     Args:
         labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_labels
@@ -192,6 +194,9 @@ def evaluate_model_per_class(model, dataloader, device, labels_str, zeroshot_lab
     label2n_correct = defaultdict(int)
     label2n_predicted = defaultdict(int)
     label2n_expected = defaultdict(int)
+
+    if progress_bar:
+        dataloader = tqdm(dataloader, desc="Evaluation")
 
     with torch.no_grad():
         for x, c, y in dataloader:
