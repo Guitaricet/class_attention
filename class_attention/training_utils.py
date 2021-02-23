@@ -1,3 +1,7 @@
+"""
+Functions used in the training script
+"""
+
 import logging
 import os
 import sys
@@ -22,8 +26,8 @@ logging.basicConfig(
 logger = logging.getLogger(os.path.basename(__file__))
 
 
-def prepare_dataset(test_class_frac, dataset_frac=1.0):
-    news_dataset = datasets.load_dataset("Fraser/news-category-dataset")
+def prepare_dataset(dataset_name_or_path, test_class_frac, dataset_frac=1.0):
+    news_dataset = _get_dataset_by_name_or_path(dataset_name_or_path)
     train_set = news_dataset["train"]
     test_set = news_dataset["validation"]
 
@@ -37,29 +41,40 @@ def prepare_dataset(test_class_frac, dataset_frac=1.0):
 
         # check that there are still multiple training classes left
         if len(_train_classes) < 2:
-            raise ValueError(f"Sampling size is too small for the *training* set, only {len(_train_classes)} left")
+            raise ValueError(
+                f"Sampling size is too small for the *training* set, only {len(_train_classes)} left"
+            )
 
         if len(_test_classes) < 2:
-            raise ValueError(f"Sampling size is too small for the *test* set, only {len(_test_classes)} left")
+            raise ValueError(
+                f"Sampling size is too small for the *test* set, only {len(_test_classes)} left"
+            )
 
-    reduced_train_set, _train_set_remainder = cat.utils.split_classes(
-        train_set, p_test_classes=test_class_frac, verbose=True
-    )
+    if test_class_frac > 0.0:
+        train_set, _ = cat.utils.split_classes(
+            train_set, p_test_classes=test_class_frac, verbose=True
+        )
 
-    train_classes = set(reduced_train_set["category"])
+    train_classes = set(train_set["category"])
     test_classes = set(test_set["category"])
 
     # do not move this code above the IF statement as it may change all_classes
-    all_classes = (train_classes | test_classes)
+    all_classes = train_classes | test_classes
     zero_shot_classes = test_classes.difference(train_classes)
 
-    return reduced_train_set, test_set, list(all_classes), list(zero_shot_classes)
+    if len(zero_shot_classes) < 2:
+        logger.warning(f"Less than two zero-shot classes in the split: {zero_shot_classes}")
+
+    return train_set, test_set, list(all_classes), list(zero_shot_classes)
 
 
-def prepare_dataloaders(test_class_frac, batch_size, model_name, dataset_frac=1.0, num_workers=8):
+def prepare_dataloaders(
+    dataset_name_or_path, test_class_frac, batch_size, model_name, dataset_frac=1.0, num_workers=8
+):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
     Args:
+        dataset_name_or_path: path to a Datasets file
         test_class_frac: 0 < float < 1, a proportion of classes that are made zero-shot
         dataset_frac: 0 < float < 1, a fraction of dataset to use
         batch_size: batch size for the dataloadres
@@ -79,7 +94,7 @@ def prepare_dataloaders(test_class_frac, batch_size, model_name, dataset_frac=1.
         test_set,
         all_classes_str,
         test_classes_str,
-    ) = prepare_dataset(test_class_frac, dataset_frac)
+    ) = prepare_dataset(dataset_name_or_path, test_class_frac, dataset_frac)
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
     label_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
@@ -192,3 +207,15 @@ def train_cat_model(
             wandb.log({f"eval/{k}": v for k, v in metrics.items()})
 
     return model
+
+
+def _get_dataset_by_name_or_path(name_or_path):
+    try:
+        dataset = datasets.load_from_disk(name_or_path)
+    except FileNotFoundError:
+        try:
+            dataset = datasets.load_dataset(name_or_path)
+        except FileNotFoundError:
+            raise ValueError(f"The dataset {name_or_path} wasn't found locally or downloaded")
+
+    return dataset

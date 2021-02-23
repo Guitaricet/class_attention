@@ -85,7 +85,9 @@ def test_valiadte_model_per_class_on_dataloader(random_model, dataloader):
 
 def test_accuracy_consistency(random_model, dataloader, possible_labels_str):
     _acc_simple = cat.utils.evaluate_model(random_model, dataloader, device="cpu")
-    all_metrics = cat.utils.evaluate_model_per_class(random_model, dataloader, device="cpu", labels_str=possible_labels_str)
+    all_metrics = cat.utils.evaluate_model_per_class(
+        random_model, dataloader, device="cpu", labels_str=possible_labels_str
+    )
     assert _acc_simple == all_metrics["acc"]
 
 

@@ -5,16 +5,22 @@ import torch.utils.data
 import class_attention as cat
 
 
+DATASET = "Fraser/news-category-dataset"
+
+
 def test_prepare_dataset():
     reduced_train_set, test_set, all_classes, test_classes = cat.training_utils.prepare_dataset(
-        test_class_frac=0.1, dataset_frac=0.001,
+        dataset_name_or_path=DATASET,
+        test_class_frac=0.1,
+        dataset_frac=0.001,
     )
 
     assert set(test_classes).issubset(set(all_classes))
     assert set(test_classes) != set(all_classes)
     assert set(test_classes).issubset(set(test_set["category"]))
-    assert len(set(test_classes).intersection(set(reduced_train_set["category"]))) == 0,\
-        "train dataset should not contain test classes"
+    assert (
+        len(set(test_classes).intersection(set(reduced_train_set["category"]))) == 0
+    ), "train dataset should not contain test classes"
 
 
 def test_prepare_dataloaders():
@@ -24,7 +30,11 @@ def test_prepare_dataloaders():
         all_classes_str,
         test_classes_str,
     ) = cat.training_utils.prepare_dataloaders(
-        test_class_frac=0.2, batch_size=32, model_name="distilbert-base-uncased", dataset_frac=0.1
+        dataset_name_or_path=DATASET,
+        test_class_frac=0.2,
+        batch_size=32,
+        model_name="distilbert-base-uncased",
+        dataset_frac=0.1,
     )
 
     assert isinstance(train_dataloader, torch.utils.data.DataLoader)
@@ -46,7 +56,12 @@ def test_training_pipeline():
         all_classes_str,
         test_classes_str,
     ) = cat.training_utils.prepare_dataloaders(
-        test_class_frac=0.2, batch_size=8, model_name="distilbert-base-uncased", dataset_frac=0.001, num_workers=0,
+        dataset_name_or_path=DATASET,
+        test_class_frac=0.2,
+        batch_size=8,
+        model_name="distilbert-base-uncased",
+        dataset_frac=0.001,
+        num_workers=0,
     )
 
     text_encoder = cat.modelling_utils.get_small_transformer()

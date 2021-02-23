@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import sys
+import json
 
 import torch
 import torch.utils.data
@@ -23,6 +24,7 @@ logging.getLogger("transformers.configuration_utils").setLevel(logging.WARNING)
 logging.getLogger("wandb.sdk.internal.internal").setLevel(logging.WARNING)
 
 MODEL = "distilbert-base-uncased"
+DATASET = "Fraser/news-category-dataset"
 
 
 def parse_args(args=None):
@@ -30,7 +32,9 @@ def parse_args(args=None):
 
     # fmt: off
     # data
-    parser.add_argument("--test-class-frac", default=0.2, type=float,
+    parser.add_argument("--dataset", default=DATASET,
+                        help="Name or path to a HuggingFace Datasets dataset")
+    parser.add_argument("--test-class-frac", default=0.0, type=float,
                         help="a fraction of classes to remove from the training set (and use for zero-shot)")
     parser.add_argument("--dataset-frac", default=1.0, type=float,
                         help="a fraction of dataset to train and evaluate on, used for debugging")
@@ -76,13 +80,17 @@ def parse_args(args=None):
         raise NotImplementedError()
 
     if args.debug:
+        logger.info("Running in a debug mode, modifying dataset, dataset_frac and test_class_frac args")
+        args.dataset = DATASET
         args.dataset_frac = 0.01
+        args.test_class_frac = 0.2
 
     return args
 
 
 def main(args):
     wandb.init(project="class_attention", config=args)
+    logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
 
     logger.info("Creating dataloaders")
     (
@@ -91,9 +99,18 @@ def main(args):
         all_classes_str,
         test_classes_str,
     ) = cat.training_utils.prepare_dataloaders(
-        args.test_class_frac, args.batch_size, args.model, args.dataset_frac
+        dataset_name_or_path=args.dataset,
+        model_name=args.model,
+        test_class_frac=args.test_class_frac,
+        dataset_frac=args.dataset_frac,
+        batch_size=args.batch_size,
     )
     wandb.config.test_classes = ",".join(sorted(test_classes_str))
+
+    logger.info(f"List of zero-shot classes: {' '.join(test_classes_str)}")
+
+    if len(test_classes_str) < 2:
+        logger.warning(f"Less than two zero-shot classes")
 
     # Model
     logger.info("Creating model and optimizer")
@@ -122,14 +139,14 @@ def main(args):
     logger.info("Starting training")
 
     cat.training_utils.train_cat_model(
-        model,
-        optimizer,
-        train_dataloader,
-        test_dataloader,
-        all_classes_str,
-        test_classes_str,
-        args.max_epochs,
-        args.device,
+        model=model,
+        optimizer=optimizer,
+        train_dataloader=train_dataloader,
+        test_dataloader=test_dataloader,
+        all_classes_str=all_classes_str,
+        test_classes_str=test_classes_str,
+        max_epochs=args.max_epochs,
+        device=args.device,
     )
 
     logger.info("Script finished successfully")

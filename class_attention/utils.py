@@ -178,7 +178,9 @@ def evaluate_model(model, dataloader, device):
     return acc
 
 
-def evaluate_model_per_class(model, dataloader, device, labels_str, zeroshot_labels=None, progress_bar=False):
+def evaluate_model_per_class(
+    model, dataloader, device, labels_str, zeroshot_labels=None, progress_bar=False
+):
     """
     Args:
         labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_labels
@@ -270,7 +272,7 @@ def _aggregate_metrics_by_class_group(metrics, class_group, suffix):
     for metric in ["R", "P", "F1"]:
         class_group_metrics = [metrics[f"{metric}/{c}"] for c in class_group]
         if len(class_group_metrics) == 0:
-            logger.warning(f"No classes for the group {class_group}")
+            logger.warning(f"No classes for the group {suffix}")
             continue
 
         metric_value = sum(class_group_metrics) / len(class_group_metrics)
