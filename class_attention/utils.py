@@ -13,6 +13,8 @@ from tokenizers.models import WordLevel
 
 from tqdm.auto import tqdm
 
+import class_attention as cat
+
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -183,6 +185,8 @@ def evaluate_model_per_class(
 ):
     """
     Args:
+        model: ClassAttentionModel
+        dataloader: pytorch DataLoader with CatTestCollator
         labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_labels
     """
     model = model.to(device)
@@ -283,3 +287,38 @@ def _aggregate_metrics_by_class_group(metrics, class_group, suffix):
 
 def monospace_html(text):
     return f"""<code><pre>{text}</code></pre>"""
+
+
+def make_test_classes_only_dataloader(dataset, test_classes_str, text_tokenizer, label_tokenizer):
+    """
+    Args:
+        dataset: ArrowDataset
+        test_classes_str: list of test class names
+
+    Returns:
+        DataLoader with CatTestCollator
+    """
+    _, only_test_classes_data = split_classes(dataset, test_classes=test_classes_str)
+
+    otc_dataset = cat.CatDataset(
+        only_test_classes_data["headline"],
+        text_tokenizer,
+        only_test_classes_data["category"],
+        label_tokenizer,
+    )
+
+    test_classes_ids = label_tokenizer.batch_encode_plus(
+        test_classes_str,
+        return_tensors="pt",
+        add_special_tokens=True,
+        padding=True,
+    )["input_ids"]
+
+    otc_collator = cat.CatTestCollator(
+        possible_labels_ids=test_classes_ids, pad_token_id=label_tokenizer.pad_token_id
+    )
+
+    otc_dataloader = torch.utils.data.DataLoader(
+        otc_dataset, collate_fn=otc_collator, shuffle=False, pin_memory=True
+    )
+    return otc_dataloader

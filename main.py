@@ -107,7 +107,7 @@ def main(args):
     )
     wandb.config.test_classes = ",".join(sorted(test_classes_str))
 
-    logger.info(f"List of zero-shot classes: {' '.join(test_classes_str)}")
+    logger.info(f"List of zero-shot classes: {', '.join(test_classes_str)}")
 
     if len(test_classes_str) < 2:
         logger.warning(f"Less than two zero-shot classes")
@@ -148,6 +148,33 @@ def main(args):
         max_epochs=args.max_epochs,
         device=args.device,
     )
+
+    if len(test_classes_str) > 1:
+        logger.info("Evaluating using zero-shot classes only")
+
+        # NOTE: prepare_dataloaders and prepare_dataset interfaces are not flexible enough
+        # and we have to do some computations a second time here
+        _, test_set, _, test_classes_str, = cat.training_utils.prepare_dataset(
+            dataset_name_or_path=args.dataset,
+            test_class_frac=args.test_class_frac,
+            dataset_frac=args.dataset_frac,
+        )
+
+        zero_shot_only_dl = cat.utils.make_test_classes_only_dataloader(
+            dataset=test_set,
+            test_classes_str=test_classes_str,
+            text_tokenizer=test_dataloader.dataset.text_tokenizer,
+            label_tokenizer=test_dataloader.dataset.label_tokenizer,
+        )
+
+        metrics = cat.utils.evaluate_model_per_class(
+            model,
+            zero_shot_only_dl,
+            device=args.device,
+            labels_str=test_classes_str,
+            zeroshot_labels=test_classes_str,
+        )
+        wandb.log({f"zero_shot_only/{k}": v for k, v in metrics.items()})
 
     logger.info("Script finished successfully")
 
