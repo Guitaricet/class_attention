@@ -273,5 +273,6 @@ def _aggregate_metrics_by_class_group(metrics, class_group, suffix):
 
     return res
 
+
 def monospace_html(text):
-    return f"""<p style="font-family:'Lucida Console', monospace">{text}</p>"""
+    return f"""<code><pre>{text}</code></pre>"""
