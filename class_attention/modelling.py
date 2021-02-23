@@ -108,8 +108,10 @@ class ClassAttentionModel(nn.Module):
 
         logits = (h_x @ h_c.T) / scaling  # [bs, n_classes]
 
-        # apply temperature
-        self.temperature.data.clamp_(math.log(1e-3), math.log(1e3))
+        # apply temperature, clamp it if it is trainable
+        if self.kwargs.get("learn_temperature"):
+            self.temperature.data.clamp_(math.log(1e-3), math.log(1e3))
+
         logits *= torch.exp(self.temperature)
 
         # fmt: off
@@ -165,6 +167,9 @@ class ClassAttentionModel(nn.Module):
         if self.kwargs.get("freeze_cls_network"):
             conditions.append(self._is_not_cls_network)
 
+        if not self.kwargs.get("learn_temperature"):
+            conditions.append(self._is_not_temperature)
+
         return (
             param
             for name, param in self.named_parameters()
@@ -178,3 +183,7 @@ class ClassAttentionModel(nn.Module):
     @staticmethod
     def _is_not_cls_network(param_name):
         return "cls_encoder" not in param_name
+
+    @staticmethod
+    def _is_not_temperature(param_name):
+        return "temperature" not in param_name
