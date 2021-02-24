@@ -27,7 +27,7 @@ logger = logging.getLogger(os.path.basename(__file__))
 
 
 def prepare_dataset(dataset_name_or_path, test_class_frac, dataset_frac=1.0):
-    news_dataset = _get_dataset_by_name_or_path(dataset_name_or_path)
+    news_dataset = get_dataset_by_name_or_path(dataset_name_or_path)
     train_set = news_dataset["train"]
     test_set = news_dataset["validation"]
 
@@ -209,7 +209,7 @@ def train_cat_model(
     return model
 
 
-def _get_dataset_by_name_or_path(name_or_path):
+def get_dataset_by_name_or_path(name_or_path):
     try:
         dataset = datasets.load_from_disk(name_or_path)
     except FileNotFoundError:
