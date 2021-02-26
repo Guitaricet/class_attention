@@ -131,12 +131,15 @@ def prepare_dataloaders(
         batch_size=batch_size,
         collate_fn=train_collator,
         num_workers=num_workers,
+        shuffle=True,
     )
+
     test_dataloader = torch.utils.data.DataLoader(
         test_dataset,
         batch_size=batch_size,
         collate_fn=test_collator,
         num_workers=num_workers,
+        shuffle=False,
     )
     return train_dataloader, test_dataloader, all_classes_str, test_classes_str
 
