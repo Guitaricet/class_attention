@@ -7,3 +7,4 @@ sklearn
 wandb~=0.10.14
 matplotlib
 pytest
+pandas

@@ -71,25 +71,34 @@ def parse_args(args=None):
     parser.add_argument("--device", default=None)
     parser.add_argument("--debug", default=False, action="store_true",
                         help="overrides the arguments for a faster run (smaller model, smaller dataset)")
-    # fmt: on
+    parser.add_argument("--predict-into-folder", default=None, type=str,
+                        help="Specify this to save predictions into a bunch of files in this folder.")
+    parser.add_argument("--tags", default=None)
 
     args = parser.parse_args(args)
     args.device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    args.tags = args.tags.split(",") if args.tags else []
+
+    # fmt: on
 
     if args.share_txt_cls_network_params:
         raise NotImplementedError()
 
     if args.debug:
-        logger.info("Running in a debug mode, modifying dataset, dataset_frac and test_class_frac args")
+        logger.info(
+            "Running in a debug mode, overriding dataset, tags, max_epochs, dataset_frac, and test_class_frac args"
+        )
         args.dataset = DATASET
         args.dataset_frac = 0.01
         args.test_class_frac = 0.2
+        args.max_epochs = 2
+        args.tags = ["debug"]
 
     return args
 
 
 def main(args):
-    wandb.init(project="class_attention", config=args)
+    wandb.init(project="class_attention", config=args, tags=args.tags)
     logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
 
     logger.info("Creating dataloaders")
@@ -138,6 +147,11 @@ def main(args):
 
     logger.info("Starting training")
 
+    predict_into_file = None
+    if args.predict_into_folder is not None:
+        os.makedirs(args.predict_into_folder, exist_ok=True)
+        predict_into_file = os.path.join(args.predict_into_folder, "predictions_all_classes.csv")
+
     cat.training_utils.train_cat_model(
         model=model,
         optimizer=optimizer,
@@ -147,10 +161,15 @@ def main(args):
         test_classes_str=test_classes_str,
         max_epochs=args.max_epochs,
         device=args.device,
+        predict_into_file=predict_into_file,
     )
 
     if len(test_classes_str) > 1:
         logger.info("Evaluating using zero-shot classes only")
+
+        predict_into_file = None
+        if args.predict_into_folder is not None:
+            predict_into_file = os.path.join(args.predict_into_folder, "predictions_zero_shot.csv")
 
         # NOTE: prepare_dataloaders and prepare_dataset interfaces are not flexible enough
         # and we have to do some computations a second time here
@@ -173,6 +192,7 @@ def main(args):
             device=args.device,
             labels_str=test_classes_str,
             zeroshot_labels=test_classes_str,
+            predict_into_file=predict_into_file,
         )
         wandb.log({f"zero_shot_only/{k}": v for k, v in metrics.items()})
 

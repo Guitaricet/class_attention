@@ -5,12 +5,15 @@ import sys
 from collections import Counter, defaultdict
 
 import torch
+import torch.utils.data
+
 import datasets
 import tokenizers
 import tokenizers.pre_tokenizers
 import tokenizers.normalizers
 from tokenizers.models import WordLevel
 
+import pandas as pd
 from tqdm.auto import tqdm
 
 import class_attention as cat
@@ -181,7 +184,13 @@ def evaluate_model(model, dataloader, device):
 
 
 def evaluate_model_per_class(
-    model, dataloader, device, labels_str, zeroshot_labels=None, progress_bar=False
+    model,
+    dataloader,
+    device,
+    labels_str,
+    zeroshot_labels=None,
+    progress_bar=False,
+    predict_into_file=None,
 ):
     """
     Args:
@@ -189,6 +198,11 @@ def evaluate_model_per_class(
         dataloader: pytorch DataLoader with CatTestCollator
         labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_labels
     """
+    if predict_into_file is not None and not isinstance(
+        dataloader.sampler, torch.utils.data.sampler.SequentialSampler
+    ):
+        raise ValueError("test dataloader should not be shuffled")
+
     model = model.to(device)
     model.eval()
 
@@ -200,6 +214,11 @@ def evaluate_model_per_class(
     label2n_correct = defaultdict(int)
     label2n_predicted = defaultdict(int)
     label2n_expected = defaultdict(int)
+
+    predictions = []
+    true_labels = []
+    texts = []
+    text_tokenizer = dataloader.dataset.text_tokenizer
 
     if progress_bar:
         dataloader = tqdm(dataloader, desc="Evaluation")
@@ -216,6 +235,12 @@ def evaluate_model_per_class(
             predicted_labels = [labels_str[i] for i in preds]
             expected_labels = [labels_str[i] for i in y]
 
+            if predict_into_file is not None:
+                predictions += predicted_labels
+                true_labels += expected_labels
+                # NOTE: this may cause concurrency issues or semaphore failures if tokenizer parallelism is not disabled
+                texts += text_tokenizer.batch_decode(x, skip_special_tokens=True)
+
             for label_pred, label_exp in zip(predicted_labels, expected_labels):
                 label2n_predicted[label_pred] += 1
                 label2n_expected[label_exp] += 1
@@ -223,6 +248,14 @@ def evaluate_model_per_class(
 
             n_correct += torch.sum(preds == y).float()
             n_total += x.shape[0]
+
+    if predict_into_file is not None:
+        dataframe = pd.DataFrame(
+            data=zip(texts, predictions, expected_labels),
+            columns=["text", "predicted label", "expected label"],
+        )
+        dataframe.to_csv(predict_into_file)
+        logger.info(f"Saved predictions into {predict_into_file}")
 
     res = {
         "acc": n_correct / n_total,

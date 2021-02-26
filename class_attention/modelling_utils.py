@@ -50,7 +50,9 @@ def make_mlp(n_layers, input_size, hidden_size):
     if n_layers == 1:
         return nn.Linear(input_size, hidden_size)
 
-    layers = [nn.Linear(input_size, hidden_size),]
+    layers = [
+        nn.Linear(input_size, hidden_size),
+    ]
     for _ in range(n_layers - 1):
         layers.append(nn.ReLU())
         layers.append(nn.Linear(hidden_size, hidden_size))

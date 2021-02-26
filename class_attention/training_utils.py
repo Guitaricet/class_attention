@@ -153,6 +153,7 @@ def train_cat_model(
     test_classes_str,
     max_epochs,
     device=None,
+    predict_into_file=None,
 ):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -205,6 +206,7 @@ def train_cat_model(
             device=device,
             labels_str=all_classes_str,
             zeroshot_labels=test_classes_str,
+            predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
         )
         if wandb.run is not None:
             wandb.log({f"eval/{k}": v for k, v in metrics.items()})
