@@ -57,6 +57,8 @@ def parse_args(args=None):
                              "nonlinearity is not used if n=1")
     parser.add_argument("--attention-type", default="dot-product",
                         choices=["dot-product", "bahdanau"])
+    parser.add_argument("--bahdanau-layers", default=1, type=int,
+                        help="number of layers in the bahdanau attention network")
 
     # training
     parser.add_argument("--max-epochs", default=10, type=int)
