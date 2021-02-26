@@ -215,9 +215,9 @@ def evaluate_model_per_class(
     label2n_predicted = defaultdict(int)
     label2n_expected = defaultdict(int)
 
-    predictions = []
-    true_labels = []
-    texts = []
+    all_predictions = []
+    all_labels = []
+    all_texts = []
     text_tokenizer = dataloader.dataset.text_tokenizer
 
     if progress_bar:
@@ -236,10 +236,10 @@ def evaluate_model_per_class(
             expected_labels = [labels_str[i] for i in y]
 
             if predict_into_file is not None:
-                predictions += predicted_labels
-                true_labels += expected_labels
+                all_predictions += predicted_labels
+                all_labels += expected_labels
                 # NOTE: this may cause concurrency issues or semaphore failures if tokenizer parallelism is not disabled
-                texts += text_tokenizer.batch_decode(x, skip_special_tokens=True)
+                all_texts += text_tokenizer.batch_decode(x, skip_special_tokens=True)
 
             for label_pred, label_exp in zip(predicted_labels, expected_labels):
                 label2n_predicted[label_pred] += 1
@@ -250,8 +250,12 @@ def evaluate_model_per_class(
             n_total += x.shape[0]
 
     if predict_into_file is not None:
+        assert (
+            len(all_texts) == len(all_predictions) == len(expected_labels)
+        ), f"{len(all_texts)} texts, {len(all_predictions)} preds, {len(all_labels)} labels"
+
         dataframe = pd.DataFrame(
-            data=zip(texts, predictions, expected_labels),
+            data=zip(all_texts, all_predictions, all_labels),
             columns=["text", "predicted label", "expected label"],
         )
         dataframe.to_csv(predict_into_file)

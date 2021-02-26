@@ -152,7 +152,7 @@ def main(args):
     predict_into_file = None
     if args.predict_into_folder is not None:
         os.makedirs(args.predict_into_folder, exist_ok=True)
-        predict_into_file = os.path.join(args.predict_into_folder, "predictions_all_classes.csv")
+        predict_into_file = os.path.join(args.predict_into_folder, "predictions_all_classes.txt")
 
     cat.training_utils.train_cat_model(
         model=model,
@@ -174,7 +174,7 @@ def main(args):
 
         predict_into_file = None
         if args.predict_into_folder is not None:
-            predict_into_file = os.path.join(args.predict_into_folder, "predictions_zero_shot.csv")
+            predict_into_file = os.path.join(args.predict_into_folder, "predictions_zero_shot.txt")
             wandb.save(predict_into_file)
 
         # NOTE: prepare_dataloaders and prepare_dataset interfaces are not flexible enough
