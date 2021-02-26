@@ -166,12 +166,16 @@ def main(args):
         predict_into_file=predict_into_file,
     )
 
+    if args.predict_into_folder is not None:
+        wandb.save(predict_into_file)
+
     if len(test_classes_str) > 1:
         logger.info("Evaluating using zero-shot classes only")
 
         predict_into_file = None
         if args.predict_into_folder is not None:
             predict_into_file = os.path.join(args.predict_into_folder, "predictions_zero_shot.csv")
+            wandb.save(predict_into_file)
 
         # NOTE: prepare_dataloaders and prepare_dataset interfaces are not flexible enough
         # and we have to do some computations a second time here
