@@ -2,22 +2,13 @@ import logging
 import os
 import random
 import sys
-from collections import Counter, defaultdict
-
-import torch
-import torch.utils.data
+from collections import Counter
 
 import datasets
 import tokenizers
 import tokenizers.pre_tokenizers
 import tokenizers.normalizers
 from tokenizers.models import WordLevel
-
-import pandas as pd
-from tqdm.auto import tqdm
-
-import class_attention as cat
-
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -153,209 +144,17 @@ def split_classes(
     return train_dataset, test_dataset
 
 
-def evaluate_model(model, dataloader, device):
-    if "CatTestCollator" not in str(dataloader.collate_fn):
-        raise RuntimeError(
-            "Validation or test dataloader should have a CatTestCollator instead of CatCollator"
-        )
-
-    model = model.to(device)
-    model.eval()
-    n_correct = 0
-    n_total = 0
-
-    with torch.no_grad():
-        for x, c, y in dataloader:
-            # Note: `c` does not change in CatTestCollator
-            x, c, y = x.to(device), c.to(device), y.to(device)
-
-            logits = model(x, c)
-
-            _, preds = logits.max(-1)
-
-            n_correct += torch.sum(preds == y).float()
-            n_total += x.shape[0]
-
-    acc = n_correct / n_total
-
-    model.train()
-
-    return acc
-
-
-def evaluate_model_per_class(
-    model,
-    dataloader,
-    device,
-    labels_str,
-    zeroshot_labels=None,
-    progress_bar=False,
-    predict_into_file=None,
-):
-    """
-    Args:
-        model: ClassAttentionModel
-        dataloader: pytorch DataLoader with CatTestCollator
-        labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_labels
-    """
-    if predict_into_file is not None and not isinstance(
-        dataloader.sampler, torch.utils.data.sampler.SequentialSampler
-    ):
-        raise ValueError("test dataloader should not be shuffled")
-
-    model = model.to(device)
-    model.eval()
-
-    if zeroshot_labels is not None and (not set(zeroshot_labels).issubset(labels_str)):
-        raise ValueError("labels_str should include all labels")
-
-    n_correct = 0
-    n_total = 0
-    label2n_correct = defaultdict(int)
-    label2n_predicted = defaultdict(int)
-    label2n_expected = defaultdict(int)
-
-    all_predictions = []
-    all_labels = []
-    all_texts = []
-    text_tokenizer = dataloader.dataset.text_tokenizer
-
-    if progress_bar:
-        dataloader = tqdm(dataloader, desc="Evaluation")
-
-    with torch.no_grad():
-        for x, c, y in dataloader:
-            # Note: `c` does not change in CatTestCollator
-            x, c, y = x.to(device), c.to(device), y.to(device)
-
-            logits = model(x, c)
-
-            _, preds = logits.max(-1)
-
-            predicted_labels = [labels_str[i] for i in preds]
-            expected_labels = [labels_str[i] for i in y]
-
-            if predict_into_file is not None:
-                all_predictions += predicted_labels
-                all_labels += expected_labels
-                # NOTE: this may cause concurrency issues or semaphore failures if tokenizer parallelism is not disabled
-                all_texts += text_tokenizer.batch_decode(x, skip_special_tokens=True)
-
-            for label_pred, label_exp in zip(predicted_labels, expected_labels):
-                label2n_predicted[label_pred] += 1
-                label2n_expected[label_exp] += 1
-                label2n_correct[label_pred] += int(label_pred == label_exp)
-
-            n_correct += torch.sum(preds == y).float()
-            n_total += x.shape[0]
-
-    if predict_into_file is not None:
-        assert (
-            len(all_texts) == len(all_predictions) == len(expected_labels)
-        ), f"{len(all_texts)} texts, {len(all_predictions)} preds, {len(all_labels)} labels"
-
-        dataframe = pd.DataFrame(
-            data=zip(all_texts, all_predictions, all_labels),
-            columns=["text", "predicted label", "expected label"],
-        )
-        dataframe.to_csv(predict_into_file)
-        logger.info(f"Saved predictions into {predict_into_file}")
-
-    res = {
-        "acc": n_correct / n_total,
-    }
-
-    for label in labels_str:
-        label_str = label
-        p = label2n_correct[label] / (label2n_predicted[label] + 1e-7)
-        r = label2n_correct[label] / (label2n_expected[label] + 1e-7)
-
-        res[f"P/{label_str}"] = p
-        res[f"R/{label_str}"] = r
-        res[f"F1/{label_str}"] = 2 * (p * r) / (p + r + 1e-7)
-
-    if zeroshot_labels is not None:
-        zeroshot_metrics = _aggregate_metrics_by_class_group(res, zeroshot_labels, "zero_shot")
-        multishot_labels = set(labels_str).difference(set(zeroshot_labels))
-        multishot_metrics = _aggregate_metrics_by_class_group(res, multishot_labels, "multi_shot")
-
-        res.update(zeroshot_metrics)
-        res.update(multishot_metrics)
-
-    model.train()
-    return res
-
-
-def _aggregate_metrics_by_class_group(metrics, class_group, suffix):
-    """
-    Averages metrics in the class_group.
-
-    Used to compute metrics for zero-shot vs multi-shot groups.
-
-    Assumes that metrics has the keys that look like
-        f"{metric}/{class_name}"
-    where metric is in ["R", "P", "F1"]
-    and
-
-    Args:
-        metrics: dict as described above
-        class_group: a list of classes
-        suffix: suffix for the dict keys
-
-    Returns:
-        dict with keys "R_{suffix}", "P_{suffix}", "F1_{suffix}"
-    """
-    if not isinstance(class_group, (list, set)):
-        raise ValueError(f"class_group should be a list of a set, got {type(class_group)} instead")
-
-    res = dict()
-
-    for metric in ["R", "P", "F1"]:
-        class_group_metrics = [metrics[f"{metric}/{c}"] for c in class_group]
-        if len(class_group_metrics) == 0:
-            logger.warning(f"No classes for the group {suffix}")
-            continue
-
-        metric_value = sum(class_group_metrics) / len(class_group_metrics)
-        res[f"{metric}_{suffix}"] = metric_value
-
-    return res
-
-
 def monospace_html(text):
     return f"""<code><pre>{text}</code></pre>"""
 
 
-def make_test_classes_only_dataloader(dataset, test_classes_str, text_tokenizer, label_tokenizer):
-    """
-    Args:
-        dataset: ArrowDataset
-        test_classes_str: list of test class names
+def get_dataset_by_name_or_path(name_or_path):
+    try:
+        dataset = datasets.load_from_disk(name_or_path)
+    except FileNotFoundError:
+        try:
+            dataset = datasets.load_dataset(name_or_path)
+        except FileNotFoundError:
+            raise ValueError(f"The dataset {name_or_path} wasn't found locally or downloaded")
 
-    Returns:
-        DataLoader with CatTestCollator
-    """
-    _, only_test_classes_data = split_classes(dataset, test_classes=test_classes_str)
-
-    otc_dataset = cat.CatDataset(
-        only_test_classes_data["headline"],
-        text_tokenizer,
-        only_test_classes_data["category"],
-        label_tokenizer,
-    )
-
-    test_classes_ids = label_tokenizer.batch_encode_plus(
-        test_classes_str,
-        return_tensors="pt",
-        add_special_tokens=True,
-        padding=True,
-    )["input_ids"]
-
-    otc_collator = cat.CatTestCollator(
-        possible_labels_ids=test_classes_ids, pad_token_id=label_tokenizer.pad_token_id
-    )
-
-    otc_dataloader = torch.utils.data.DataLoader(
-        otc_dataset, collate_fn=otc_collator, shuffle=False, pin_memory=True
-    )
-    return otc_dataloader
+    return dataset

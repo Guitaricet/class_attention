@@ -8,14 +8,13 @@ import sys
 
 import torch
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 
-import datasets
 import transformers
 import wandb
 from tqdm.auto import tqdm
 
 import class_attention as cat
-
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -26,8 +25,8 @@ logging.basicConfig(
 logger = logging.getLogger(os.path.basename(__file__))
 
 
-def prepare_dataset(dataset_name_or_path, test_class_frac, dataset_frac=1.0):
-    news_dataset = get_dataset_by_name_or_path(dataset_name_or_path)
+def prepare_dataset(dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0):
+    news_dataset = cat.utils.get_dataset_by_name_or_path(dataset_name_or_path)
     train_set = news_dataset["train"]
     test_set = news_dataset["validation"]
 
@@ -70,7 +69,7 @@ def prepare_dataset(dataset_name_or_path, test_class_frac, dataset_frac=1.0):
 
 def prepare_dataloaders(
     dataset_name_or_path, test_class_frac, batch_size, model_name, dataset_frac=1.0, num_workers=8
-):
+) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
     Args:
@@ -107,9 +106,9 @@ def prepare_dataloaders(
         label_tokenizer,
     )
     test_dataset = cat.CatDataset(
-        reduced_train_set["headline"],
+        test_set["headline"],
         text_tokenizer,
-        reduced_train_set["category"],
+        test_set["category"],
         label_tokenizer,
     )
 
@@ -126,7 +125,7 @@ def prepare_dataloaders(
         possible_labels_ids=all_classes_ids, pad_token_id=label_tokenizer.pad_token_id
     )
 
-    train_dataloader = torch.utils.data.DataLoader(
+    train_dataloader = DataLoader(
         reduced_train_dataset,
         batch_size=batch_size,
         collate_fn=train_collator,
@@ -134,14 +133,16 @@ def prepare_dataloaders(
         shuffle=True,
     )
 
-    test_dataloader = torch.utils.data.DataLoader(
+    test_dataloader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         collate_fn=test_collator,
         num_workers=num_workers,
         shuffle=False,
     )
-    return train_dataloader, test_dataloader, all_classes_str, test_classes_str
+
+    data = {"train": reduced_train_set, "test": test_set}
+    return train_dataloader, test_dataloader, all_classes_str, test_classes_str, data
 
 
 def train_cat_model(
@@ -200,7 +201,7 @@ def train_cat_model(
             optimizer.step()
 
         # validation
-        metrics = cat.utils.evaluate_model_per_class(
+        metrics = cat.evaluation_utils.evaluate_model(
             model,
             test_dataloader,
             device=device,
@@ -209,18 +210,20 @@ def train_cat_model(
             predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
         )
         if wandb.run is not None:
-            wandb.log({f"eval/{k}": v for k, v in metrics.items()})
+            wandb.log(metrics)
 
     return model
 
 
-def get_dataset_by_name_or_path(name_or_path):
-    try:
-        dataset = datasets.load_from_disk(name_or_path)
-    except FileNotFoundError:
-        try:
-            dataset = datasets.load_dataset(name_or_path)
-        except FileNotFoundError:
-            raise ValueError(f"The dataset {name_or_path} wasn't found locally or downloaded")
+def validate_dataloader(dataloader: DataLoader, test_classes, is_test=False):
+    if is_test:
+        assert isinstance(dataloader.sampler, torch.utils.data.sampler.SequentialSampler)
+    else:
+        assert isinstance(dataloader.sampler, torch.utils.data.sampler.RandomSampler)
 
-    return dataset
+    dataset: cat.CatDataset = dataloader.dataset
+
+    if is_test:
+        assert set(dataset.labels).issuperset(set(test_classes))
+    else:
+        assert set(dataset.labels).isdisjoint(set(test_classes))

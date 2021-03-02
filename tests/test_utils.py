@@ -60,35 +60,36 @@ def dataloader(train_texts, train_labels, possible_labels_str):
     return dataloader
 
 
-def test_validate_model_on_dataloader(random_model, dataloader):
-    _acc = cat.utils.evaluate_model(random_model, dataloader, device="cpu")
-    assert 0 <= _acc <= 1
-
-
 def test_valiadte_model_per_class_on_dataloader(random_model, dataloader):
     labels = ["My News", "Weather", "Sport"]
-    metrics = _acc = cat.utils.evaluate_model_per_class(
+    metrics = cat.evaluation_utils.evaluate_model(
         random_model, dataloader, device="cpu", labels_str=labels, zeroshot_labels=["My News"]
     )
 
+    assert 0 <= metrics["eval/acc"] <= 1
+    assert 0 <= metrics["eval/P_macro"] <= 1
+    assert 0 <= metrics["eval/R_macro"] <= 1
+    assert 0 <= metrics["eval/F1_macro"] <= 1
+
+    assert 0 <= metrics["zero_shot_eval/acc"] <= 1
+    assert 0 <= metrics["zero_shot_eval/P_macro"] <= 1
+    assert 0 <= metrics["zero_shot_eval/R_macro"] <= 1
+    assert 0 <= metrics["zero_shot_eval/F1_macro"] <= 1
+
+    assert 0 <= metrics["multi_shot_eval/acc"] <= 1
+    assert 0 <= metrics["multi_shot_eval/P_macro"] <= 1
+    assert 0 <= metrics["multi_shot_eval/R_macro"] <= 1
+    assert 0 <= metrics["multi_shot_eval/F1_macro"] <= 1
+
     at_least_one = False
-    assert 0 <= metrics["acc"] <= 1
     for metric in ["P", "R"]:
         for label in labels:
-            m = metrics[f"{metric}/{label}"]
+            m = metrics[f"eval_per_class/{label}/{metric}"]
             assert 0 <= m <= 1
             if m > 0 and m < 1:
                 at_least_one = True
 
     assert at_least_one, "all metrics are either 0 or 1"
-
-
-def test_accuracy_consistency(random_model, dataloader, possible_labels_str):
-    _acc_simple = cat.utils.evaluate_model(random_model, dataloader, device="cpu")
-    all_metrics = cat.utils.evaluate_model_per_class(
-        random_model, dataloader, device="cpu", labels_str=possible_labels_str
-    )
-    assert _acc_simple == all_metrics["acc"]
 
 
 def test_split_classes_no_zero_shot(dataloader):

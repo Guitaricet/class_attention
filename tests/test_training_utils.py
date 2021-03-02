@@ -29,6 +29,7 @@ def test_prepare_dataloaders():
         test_dataloader,
         all_classes_str,
         test_classes_str,
+        data,
     ) = cat.training_utils.prepare_dataloaders(
         dataset_name_or_path=DATASET,
         test_class_frac=0.2,
@@ -46,6 +47,10 @@ def test_prepare_dataloaders():
     assert isinstance(all_classes_str[0], str)
     assert isinstance(test_classes_str[0], str)
     assert set(all_classes_str).issuperset(set(test_classes_str))
+    assert train_dataloader.dataset != test_dataloader.dataset[0]
+    assert isinstance(data, dict)
+    assert "train" in data
+    assert "test" in data
 
 
 def test_training_pipeline():
@@ -55,6 +60,7 @@ def test_training_pipeline():
         test_dataloader,
         all_classes_str,
         test_classes_str,
+        data,
     ) = cat.training_utils.prepare_dataloaders(
         dataset_name_or_path=DATASET,
         test_class_frac=0.2,

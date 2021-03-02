@@ -12,7 +12,6 @@ import wandb
 
 import class_attention as cat
 
-
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -109,6 +108,7 @@ def main(args):
         test_dataloader,
         all_classes_str,
         test_classes_str,
+        data,
     ) = cat.training_utils.prepare_dataloaders(
         dataset_name_or_path=args.dataset,
         model_name=args.model,
@@ -117,6 +117,9 @@ def main(args):
         batch_size=args.batch_size,
     )
     wandb.config.test_classes = ",".join(sorted(test_classes_str))
+
+    cat.training_utils.validate_dataloader(test_dataloader, test_classes_str, is_test=True)
+    cat.training_utils.validate_dataloader(train_dataloader, test_classes_str, is_test=False)
 
     logger.info(f"List of zero-shot classes: {', '.join(test_classes_str)}")
 
@@ -172,35 +175,46 @@ def main(args):
     if len(test_classes_str) > 1:
         logger.info("Evaluating using zero-shot classes only")
 
-        predict_into_file = None
         if args.predict_into_folder is not None:
             predict_into_file = os.path.join(args.predict_into_folder, "predictions_zero_shot.txt")
-            wandb.save(predict_into_file)
 
-        # NOTE: prepare_dataloaders and prepare_dataset interfaces are not flexible enough
-        # and we have to do some computations a second time here
-        _, test_set, _, test_classes_str, = cat.training_utils.prepare_dataset(
-            dataset_name_or_path=args.dataset,
-            test_class_frac=args.test_class_frac,
-            dataset_frac=args.dataset_frac,
-        )
-
-        zero_shot_only_dl = cat.utils.make_test_classes_only_dataloader(
-            dataset=test_set,
+        zero_shot_only_metrics = cat.evaluation_utils.evaluate_model_on_subset(
+            model=model,
+            dataset_str=data["test"],
             test_classes_str=test_classes_str,
             text_tokenizer=test_dataloader.dataset.text_tokenizer,
             label_tokenizer=test_dataloader.dataset.label_tokenizer,
+            predict_into_file=predict_into_file,
+            device=args.device,
         )
 
-        metrics = cat.utils.evaluate_model_per_class(
-            model,
-            zero_shot_only_dl,
-            device=args.device,
-            labels_str=test_classes_str,
-            zeroshot_labels=test_classes_str,
+        if args.predict_into_folder is not None:
+            wandb.save(predict_into_file)
+
+        wandb.log({f"zero_shot_only_{k}": v for k, v in zero_shot_only_metrics.items()})
+
+        logger.info("Evaluating using multi-shot classes only")
+        if args.predict_into_folder is not None:
+            predict_into_file = os.path.join(
+                args.predict_into_folder, "predictions_multi_shot.txt"
+            )
+
+        multi_shot_classes = list(set(all_classes_str).difference(set(test_classes_str)))
+
+        multi_shot_only_metrics = cat.evaluation_utils.evaluate_model_on_subset(
+            model=model,
+            dataset_str=data["test"],
+            test_classes_str=multi_shot_classes,
+            text_tokenizer=test_dataloader.dataset.text_tokenizer,
+            label_tokenizer=test_dataloader.dataset.label_tokenizer,
             predict_into_file=predict_into_file,
+            device=args.device,
         )
-        wandb.log({f"zero_shot_only/{k}": v for k, v in metrics.items()})
+
+        if predict_into_file is not None:
+            wandb.save(predict_into_file)
+
+        wandb.log({f"multi_shot_only_{k}": v for k, v in multi_shot_only_metrics.items()})
 
     logger.info("Script finished successfully")
 

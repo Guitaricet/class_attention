@@ -96,3 +96,12 @@ news_dataset["validation"] = cat.utils.sample_dataset(news_dataset["validation"]
 news_dataset["test"] = cat.utils.sample_dataset(news_dataset["test"], p)
 
 news_dataset.save_to_disk("../data/news-category-random-split-small")
+
+# repeat this to have an extremely small dataset (1/1000 laof the original) used for debugging
+
+p = 0.01
+news_dataset["train"] = cat.utils.sample_dataset(news_dataset["train"], p)
+news_dataset["validation"] = cat.utils.sample_dataset(news_dataset["validation"], p)
+news_dataset["test"] = cat.utils.sample_dataset(news_dataset["test"], p)
+
+news_dataset.save_to_disk("../data/news-category-random-split-tiny")

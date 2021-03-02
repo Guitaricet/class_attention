@@ -12,6 +12,8 @@ import numpy as np
 import sklearn
 from sklearn.svm import LinearSVC
 from sklearn.feature_extraction.text import TfidfVectorizer
+
+import class_attention.utils
 import wandb
 
 import class_attention as cat
@@ -35,6 +37,20 @@ def compute_metrics(eval_pred):
     predictions = np.argmax(predictions, axis=1)
 
     return {"accuracy": np.sum(predictions == labels) / predictions.shape[0]}
+
+
+def compute_metrics_full(eval_pred):
+    predictions, labels = eval_pred
+    predictions = np.argmax(predictions, axis=1)
+
+    # we do this to unnumpy tensors into lists
+    labels_str = [str(l) for l in labels]
+    predictions_str = [str(p) for p in predictions]
+
+    metrics, _ = cat.evaluation_utils.compute_metrics(y_true=labels_str, y_pred=predictions_str)
+    metrics["accuracy"] = metrics["acc"]
+
+    return metrics
 
 
 def parse_args(args=None):
@@ -65,7 +81,7 @@ def parse_args(args=None):
 def main(args):
     logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
     logger.info("Preparing the data")
-    news_dataset = cat.training_utils.get_dataset_by_name_or_path(args.dataset)
+    news_dataset = class_attention.utils.get_dataset_by_name_or_path(args.dataset)
 
     train_set = news_dataset["train"]
     valid_set = news_dataset["validation"]
@@ -117,7 +133,7 @@ def main(args):
 
     training_args = transformers.TrainingArguments(
         output_dir="debug_outputs",
-        evaluation_strategy="epoch",
+        evaluation_strategy=transformers.EvaluationStrategy.EPOCH,
         learning_rate=args.lr,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
@@ -132,10 +148,14 @@ def main(args):
         train_dataset=encoded_train_set,
         eval_dataset=encoded_valid_set,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics_full,
     )
 
     trainer.train()
+
+    # trainer.compute_metrics = compute_metrics_full
+    # prediction_output_obj = trainer.predict(test_dataset=encoded_valid_set)
+    # wandb.log(prediction_output_obj.metrics)
 
     logger.info("Script finished successfully")
 
