@@ -5,7 +5,6 @@ import torch.nn as nn
 import wandb
 
 from class_attention import modelling_utils
-from class_attention.modelling_misc import IdentityLayer
 
 
 class ClassAttentionModel(nn.Module):
@@ -35,8 +34,8 @@ class ClassAttentionModel(nn.Module):
         self.validate_kwargs(kwargs)
         self.kwargs = kwargs or dict()
 
-        self.txt_out = IdentityLayer()
-        self.cls_out = IdentityLayer()
+        self.txt_out = nn.Identity()
+        self.cls_out = nn.Identity()
 
         use_n_projection_layers = self.kwargs.get("use_n_projection_layers", None)
         if use_n_projection_layers is not None:
@@ -135,7 +134,7 @@ class ClassAttentionModel(nn.Module):
         if use_n_projection_layers is not None:
             if use_n_projection_layers < 0:
                 raise ValueError(use_n_projection_layers)
-            if use_n_projection_layers > 0 and hidden_size is not None:
+            if use_n_projection_layers > 0 and hidden_size is None:
                 raise ValueError("hidden size should be specified with use_n_projection_layers")
 
         if kwargs.get("share_txt_cls_network_params") and kwargs.get("freeze_cls_network"):

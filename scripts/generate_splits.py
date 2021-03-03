@@ -105,3 +105,5 @@ news_dataset["validation"] = cat.utils.sample_dataset(news_dataset["validation"]
 news_dataset["test"] = cat.utils.sample_dataset(news_dataset["test"], p)
 
 news_dataset.save_to_disk("../data/news-category-random-split-tiny")
+
+print("Script finished successfully")
