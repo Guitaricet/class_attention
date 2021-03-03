@@ -38,7 +38,7 @@ class ClassAttentionModel(nn.Module):
         self.cls_out = nn.Identity()
 
         use_n_projection_layers = self.kwargs.get("use_n_projection_layers", None)
-        if use_n_projection_layers is not None:
+        if use_n_projection_layers is not None and use_n_projection_layers > 0:
             hidden_size = self.kwargs["hidden_size"]  # guaranteed in validate_kwargs
             self.txt_out = modelling_utils.make_mlp(
                 n_layers=use_n_projection_layers,
@@ -129,6 +129,9 @@ class ClassAttentionModel(nn.Module):
             return
 
         use_n_projection_layers = kwargs.get("use_n_projection_layers")
+        if use_n_projection_layers is not None and use_n_projection_layers < 1:
+            raise ValueError(use_n_projection_layers)
+
         hidden_size = kwargs.get("hidden_size")
 
         if use_n_projection_layers is not None:
@@ -144,7 +147,7 @@ class ClassAttentionModel(nn.Module):
             )
 
     def make_bahdanau_attention(self, kwargs):
-        if kwargs.get("use_n_projection_layers") is not None:
+        if kwargs.get("hidden_size") is not None:
             attention_size = 2 * kwargs.get("hidden_size")
         else:
             txt_encoder_h = modelling_utils.get_output_dim(self.txt_encoder)

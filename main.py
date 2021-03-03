@@ -51,7 +51,7 @@ def parse_args(args=None):
                         help="learn the softmax temperature as an additional scalar parameter")
     parser.add_argument("--remove-n-lowest-pc", default=0, type=int,
                         help="remove n lowest principal components from the class embeddings")
-    parser.add_argument("--use-n-projection-layers", default=0, type=int,
+    parser.add_argument("--use-n-projection-layers", default=None, type=int,
                         help="transform text embedding and class embedding using FCN with this many layers; "
                              "nonlinearity is not used if n=1")
     parser.add_argument("--attention-type", default="dot-product",

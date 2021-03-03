@@ -46,6 +46,8 @@ def normalize_embeds(embeds):
 def make_mlp(n_layers, input_size, hidden_size):
     if not isinstance(n_layers, int):
         raise ValueError(f"n_layers should be int, got {type(n_layers)} instead")
+    if n_layers < 1:
+        raise ValueError(n_layers)
 
     if n_layers == 1:
         return nn.Linear(input_size, hidden_size)
