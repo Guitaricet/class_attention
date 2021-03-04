@@ -43,7 +43,7 @@ def normalize_embeds(embeds):
     return embeds / torch.sqrt(torch.sum(embeds * embeds, dim=1, keepdim=True))
 
 
-def make_mlp(n_layers, input_size, hidden_size, output_size=None):
+def make_mlp(n_layers, input_size, hidden_size, output_size=None, use_bias=True):
     if not isinstance(n_layers, int):
         raise ValueError(f"n_layers should be int, got {type(n_layers)} instead")
     if n_layers < 1:
@@ -52,16 +52,16 @@ def make_mlp(n_layers, input_size, hidden_size, output_size=None):
     output_size = output_size or hidden_size
 
     if n_layers == 1:
-        return nn.Linear(input_size, output_size)
+        return nn.Linear(input_size, output_size, bias=use_bias)
 
     layers = [
         nn.Linear(input_size, hidden_size),
     ]
     for _ in range(n_layers - 2):
         layers.append(nn.ReLU())
-        layers.append(nn.Linear(hidden_size, hidden_size))
+        layers.append(nn.Linear(hidden_size, hidden_size, bias=use_bias))
 
-    layers.append(nn.Linear(hidden_size, output_size))
+    layers.append(nn.Linear(hidden_size, output_size, bias=use_bias))
 
     model = nn.Sequential(*layers)
     return model

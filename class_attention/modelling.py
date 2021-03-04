@@ -44,11 +44,13 @@ class ClassAttentionModel(nn.Module):
                 n_layers=use_n_projection_layers,
                 input_size=txt_encoder_h,
                 hidden_size=hidden_size,
+                use_bias=kwargs.get("use_bias", True),
             )
             self.cls_out = cat.modelling_utils.make_mlp(
                 n_layers=use_n_projection_layers,
                 input_size=cls_encoder_h,
                 hidden_size=hidden_size,
+                use_bias=kwargs.get("use_bias", True),
             )
 
         # make bahdanau attention
@@ -166,6 +168,7 @@ class ClassAttentionModel(nn.Module):
             input_size=attention_size,
             hidden_size=attention_size // 2,
             output_size=1,
+            use_bias=kwargs.get("use_bias", True),
         )
         return bahdanau_network
 
