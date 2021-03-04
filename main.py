@@ -66,6 +66,7 @@ def parse_args(args=None):
     parser.add_argument("--freeze-projections", default=False, action="store_true",
                         help="do not train cls_out and txt_out")
     parser.add_argument("--freeze-cls-network", default=False, action="store_true")
+    parser.add_argument("--freeze-txt-network", default=False, action="store_true")
     parser.add_argument("--share-txt-cls-network-params", default=False, action="store_true")
 
     # misc

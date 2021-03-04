@@ -100,18 +100,17 @@ class ClassAttentionModel(nn.Module):
         if self.kwargs.get("normalize_cls"):
             h_c = cat.modelling_utils.normalize_embeds(h_c)
 
-        # the scaling is extremely important if normalization is not used
-        scaling = 1
-        if self.kwargs.get("scale_attention"):
-            scaling = h_c.size(-1) ** 0.5
-
         # either compute a dot product or a Bahdanau-like attention score
         if self.kwargs.get("attention_type") == "bahdanau":
-            logits = self._bahdanau_attention_fn(h_x, h_c) / scaling
+            logits = self._bahdanau_attention_fn(ht=h_x, hc=h_c)
         else:
-            logits = (h_x @ h_c.T) / scaling  # [bs, n_classes]
+            logits = (h_x @ h_c.T)  # [bs, n_classes]
 
         assert logits.shape == (h_x.shape[0], h_c.shape[0]), logits.shape
+
+        # the scaling is extremely important if normalization is not used
+        if self.kwargs.get("scale_attention"):
+            logits = logits / (logits.size(-1) ** 0.5)
 
         # apply temperature, clamp it if it is trainable
         if self.kwargs.get("learn_temperature"):
