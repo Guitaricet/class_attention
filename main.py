@@ -58,6 +58,8 @@ def parse_args(args=None):
                         choices=["dot-product", "bahdanau"])
     parser.add_argument("--bahdanau-layers", default=1, type=int,
                         help="number of layers in the bahdanau attention network")
+    parser.add_argument("--no-bias", default=False, action="set_true",
+                        help="do not use bias in added layers")
 
     # training
     parser.add_argument("--max-epochs", default=10, type=int)
@@ -85,6 +87,8 @@ def parse_args(args=None):
 
     if args.share_txt_cls_network_params:
         raise NotImplementedError()
+
+    args.use_bias = not args.no_bias
 
     if args.debug:
         logger.info(
