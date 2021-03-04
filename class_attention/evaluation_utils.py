@@ -204,6 +204,8 @@ def compute_metrics(y_true, y_pred, class_group=None, prefix=None, suffix=None):
         raise ValueError(
             f"y_true len {len(y_true)}, y_pred len {len(y_pred)}, but they should be equal"
         )
+    if len(y_true) < 1:
+        raise ValueError("y_true and y_pred should be at least one element")
 
     prefix = _handle_prefix(prefix)
     suffix = _handle_suffix(suffix)

@@ -83,14 +83,14 @@ class ClassAttentionModel(nn.Module):
 
         h_c = self.cls_encoder(**labels_input)  # some tuple
         h_c = h_c[0]  # FloatTensor[n_classes, class_seq_len, hidden]
-        h_c = h_c[:, 0]  # get CLS token representations, FloatTensor[bs, hidden]
+        h_c = h_c[:, 0]  # get CLS token representations, FloatTensor[n_classes, hidden]
 
         # maybe projections
         h_x = self.txt_out(h_x)
         h_c = self.cls_out(h_c)
 
         if self.kwargs.get("remove_n_lowest_pc"):
-            h_c = modelling_utils.remove_smallest_principial_component(
+            h_c = modelling_utils.remove_smallest_princpial_component(
                 h_c, remove_n=self.kwargs.get("remove_n_lowest_pc")
             )
 
@@ -105,7 +105,13 @@ class ClassAttentionModel(nn.Module):
         if self.kwargs.get("scale_attention"):
             scaling = h_c.size(-1) ** 0.5
 
-        logits = (h_x @ h_c.T) / scaling  # [bs, n_classes]
+        # either compute a dot product or a Bahdanau-like attention score
+        if self.bahdanau_network is None:
+            logits = (h_x @ h_c.T) / scaling  # [bs, n_classes]
+        else:
+            logits = self._bahdanau_attention_fn(h_x, h_c) / scaling
+
+        assert logits.shape == (h_x.shape[0], h_c.shape[0]), logits.shape
 
         # apply temperature, clamp it if it is trainable
         if self.kwargs.get("learn_temperature"):
@@ -147,7 +153,8 @@ class ClassAttentionModel(nn.Module):
             )
 
     def make_bahdanau_attention(self, kwargs):
-        if kwargs.get("hidden_size") is not None:
+        # if we have a projection, our input size may be different
+        if kwargs.get("use_n_projection_layers"):
             attention_size = 2 * kwargs.get("hidden_size")
         else:
             txt_encoder_h = modelling_utils.get_output_dim(self.txt_encoder)
@@ -159,6 +166,7 @@ class ClassAttentionModel(nn.Module):
             n_layers=n_attention_layers,
             input_size=attention_size,
             hidden_size=attention_size // 2,
+            output_size=1,
         )
         return bahdanau_network
 
@@ -178,6 +186,22 @@ class ClassAttentionModel(nn.Module):
             if all(cond(name) for cond in conditions)
         )
 
+    def _bahdanau_attention_fn(self, ht, hc):
+        batch_size, t_hidden = ht.shape
+        n_classes, c_hidden = hc.shape
+
+        ht_repeated = ht.repeat([1, n_classes]).view(batch_size * n_classes, t_hidden)
+        hc_repeated = hc.repeat([batch_size, 1])
+
+        hx = torch.cat([ht_repeated, hc_repeated], dim=-1)  # the order is important
+        # pair i+j means i-th example and j-th class
+        attn_scores = self.bahdanau_network(hx)  # [batch_size * n_classes, 1]
+
+        # reshaped in such a way that batch_size is actually a batch dimension
+        # and n_classes is a class dimension
+        attn_scores = attn_scores.view(batch_size, n_classes)
+        return attn_scores
+
     @staticmethod
     def _is_not_proj(param_name):
         return "txt_out" not in param_name and "cls_out" not in param_name
@@ -189,3 +213,4 @@ class ClassAttentionModel(nn.Module):
     @staticmethod
     def _is_not_temperature(param_name):
         return "temperature" not in param_name
+

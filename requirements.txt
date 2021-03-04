@@ -4,7 +4,7 @@ transformers
 tokenizers==0.10
 datasets
 sklearn
-wandb~=0.10.14
+wandb~=0.10.21
 matplotlib
 pytest
 pandas

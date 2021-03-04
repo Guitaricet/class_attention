@@ -43,27 +43,31 @@ def normalize_embeds(embeds):
     return embeds / torch.sqrt(torch.sum(embeds * embeds, dim=1, keepdim=True))
 
 
-def make_mlp(n_layers, input_size, hidden_size):
+def make_mlp(n_layers, input_size, hidden_size, output_size=None):
     if not isinstance(n_layers, int):
         raise ValueError(f"n_layers should be int, got {type(n_layers)} instead")
     if n_layers < 1:
         raise ValueError(n_layers)
 
+    output_size = output_size or hidden_size
+
     if n_layers == 1:
-        return nn.Linear(input_size, hidden_size)
+        return nn.Linear(input_size, output_size)
 
     layers = [
         nn.Linear(input_size, hidden_size),
     ]
-    for _ in range(n_layers - 1):
+    for _ in range(n_layers - 2):
         layers.append(nn.ReLU())
         layers.append(nn.Linear(hidden_size, hidden_size))
+
+    layers.append(hidden_size, output_size)
 
     model = nn.Sequential(*layers)
     return model
 
 
-def remove_smallest_principial_component(vecs, remove_n=1):
+def remove_smallest_princpial_component(vecs, remove_n=1):
     """Leaves the dimensionality the same,
     but zeroes the direction corresponding
     to the smallest singular value eigenvector.
