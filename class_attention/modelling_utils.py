@@ -67,6 +67,40 @@ def make_mlp(n_layers, input_size, hidden_size, output_size=None):
     return model
 
 
+def bahdanau_fn(key, query, scoring_fn):
+    """Compute bahdanau-like attention
+
+    Args:
+        key: Tensor[src_len, hidden1]
+        query: Tensor[tgt_len, hidden2]
+        scoring_fn: network: [hidden1 + hidden2] -> 1
+
+    Returns:
+        Tensor[src_len, tgt_len] of unnormalized attention scores
+    """
+    batch_size, k_hidden = key.shape
+    n_classes, q_hidden = query.shape
+
+    # repeats ht like this (if n_classses=3)
+    # [ht1, ht1, ht1, ht2, ht2, ht2, ht3, ...]
+    # makes is batch of repeats
+    ht_repeated = key.repeat([1, n_classes]).view(batch_size * n_classes, k_hidden)
+
+    # repeats hc like this (if n_classses=3)
+    # [hc1, hc2, hc3, hc1, hc2, hc3, hc1, ...]
+    # makes it batch of class sequences
+    hc_repeated = query.repeat([batch_size, 1])
+
+    hx = torch.cat([ht_repeated, hc_repeated], dim=-1)  # the order is important
+    # pair i+j means i-th example and j-th class
+    attn_scores = scoring_fn(hx)  # [batch_size * n_classes, 1]
+
+    # reshaped in such a way that batch_size is actually a batch dimension
+    # and n_classes is a class dimension
+    attn_scores = attn_scores.view(batch_size, n_classes)
+    return attn_scores
+
+
 def remove_smallest_princpial_component(vecs, remove_n=1):
     """Leaves the dimensionality the same,
     but zeroes the direction corresponding
