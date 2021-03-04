@@ -58,7 +58,7 @@ def parse_args(args=None):
                         choices=["dot-product", "bahdanau"])
     parser.add_argument("--bahdanau-layers", default=1, type=int,
                         help="number of layers in the bahdanau attention network")
-    parser.add_argument("--no-bias", default=False, action="set_true",
+    parser.add_argument("--no-bias", default=False, action="store_true",
                         help="do not use bias in added layers")
 
     # training
