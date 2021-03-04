@@ -61,7 +61,7 @@ def make_mlp(n_layers, input_size, hidden_size, output_size=None):
         layers.append(nn.ReLU())
         layers.append(nn.Linear(hidden_size, hidden_size))
 
-    layers.append(hidden_size, output_size)
+    layers.append(nn.Linear(hidden_size, output_size))
 
     model = nn.Sequential(*layers)
     return model

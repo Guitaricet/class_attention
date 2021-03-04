@@ -106,10 +106,10 @@ class ClassAttentionModel(nn.Module):
             scaling = h_c.size(-1) ** 0.5
 
         # either compute a dot product or a Bahdanau-like attention score
-        if self.bahdanau_network is None:
-            logits = (h_x @ h_c.T) / scaling  # [bs, n_classes]
-        else:
+        if self.kwargs.get("attention_type") == "bahdanau":
             logits = self._bahdanau_attention_fn(h_x, h_c) / scaling
+        else:
+            logits = (h_x @ h_c.T) / scaling  # [bs, n_classes]
 
         assert logits.shape == (h_x.shape[0], h_c.shape[0]), logits.shape
 
