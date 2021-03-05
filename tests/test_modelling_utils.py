@@ -36,6 +36,8 @@ def test_bahdanau_fn_numeric():
         [ 0,  0, -1,  0, -1],
     ])
     scoring_fn = lambda x: torch.sum(x[:, :5] * x[:, 5:], dim=-1)
+    # this scoring function is an equivalent of dot product
+    # used as a sanity check
     assert scoring_fn(torch.cat([ht[0], hc[0]], dim=-1).unsqueeze(0)) == ht[0] @ hc[0].T
 
     expected_scores = torch.FloatTensor([

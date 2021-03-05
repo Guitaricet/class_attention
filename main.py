@@ -72,6 +72,8 @@ def parse_args(args=None):
     parser.add_argument("--freeze-cls-network", default=False, action="store_true")
     parser.add_argument("--freeze-txt-network", default=False, action="store_true")
     parser.add_argument("--share-txt-cls-network-params", default=False, action="store_true")
+    parser.add_argument("--p-training-classes", default=0, type=float,
+                        help="proportion of classes to feed into the model during of training at every batch")
 
     # misc
     parser.add_argument("--device", default=None)
@@ -122,6 +124,7 @@ def main(args):
         test_class_frac=args.test_class_frac,
         dataset_frac=args.dataset_frac,
         batch_size=args.batch_size,
+        p_training_classes=args.p_training_classes,
     )
     wandb.config.test_classes = ",".join(sorted(test_classes_str))
 

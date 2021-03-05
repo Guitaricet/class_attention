@@ -75,6 +75,7 @@ def prepare_dataloaders(
     dataset_frac=1.0,
     num_workers=8,
     glove_path=None,
+    p_training_classes=0,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -132,7 +133,11 @@ def prepare_dataloaders(
         padding=True,
     )["input_ids"]
 
-    train_collator = cat.CatCollator(pad_token_id=label_tokenizer.pad_token_id)
+    train_collator = cat.CatCollator(
+        pad_token_id=label_tokenizer.pad_token_id,
+        possible_labels_ids=all_classes_ids,
+        p_classes=p_training_classes,
+    )
     test_collator = cat.CatTestCollator(
         possible_labels_ids=all_classes_ids, pad_token_id=label_tokenizer.pad_token_id
     )
