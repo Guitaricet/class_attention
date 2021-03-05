@@ -84,6 +84,9 @@ class CatCollator:
 
         if self.p_classes == 1:
             unique_labels = self.possible_labels_ids
+            targets = get_index(
+                self.possible_labels_ids, _pre_batch_y
+            )
 
         return batch_x, unique_labels, targets
 
