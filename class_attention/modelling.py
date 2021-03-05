@@ -2,6 +2,7 @@ import math
 
 import torch
 import torch.nn as nn
+import transformers
 import wandb
 
 import class_attention as cat
@@ -28,8 +29,8 @@ class ClassAttentionModel(nn.Module):
 
         self.txt_encoder = txt_encoder
         self.cls_encoder = cls_encoder
-        txt_encoder_h = cat.modelling_utils.get_output_dim(self.txt_encoder)
-        cls_encoder_h = cat.modelling_utils.get_output_dim(self.cls_encoder)
+        txt_encoder_h = get_output_dim(self.txt_encoder)
+        cls_encoder_h = get_output_dim(self.cls_encoder)
 
         self.validate_kwargs(kwargs)
         self.kwargs = kwargs or dict()
@@ -76,7 +77,9 @@ class ClassAttentionModel(nn.Module):
             labels_input: dict with key input_ids
                 input_ids: LongTensor[n_classes, class_seq_len], a list of possible classes, each class described via text
         """
-        text_input, labels_input = cat.modelling_utils.maybe_format_inputs(text_input, labels_input)
+        text_input, labels_input = cat.modelling_utils.maybe_format_inputs(
+            text_input, labels_input
+        )
         cat.modelling_utils.validate_inputs(text_input, labels_input)
 
         h_x = self.txt_encoder(**text_input)  # some tuple
@@ -106,7 +109,7 @@ class ClassAttentionModel(nn.Module):
         if self.kwargs.get("attention_type") == "bahdanau":
             logits = self._bahdanau_attention_fn(ht=h_x, hc=h_c)
         else:
-            logits = (h_x @ h_c.T)  # [bs, n_classes]
+            logits = h_x @ h_c.T  # [bs, n_classes]
 
         assert logits.shape == (h_x.shape[0], h_c.shape[0]), logits.shape
 
@@ -158,8 +161,8 @@ class ClassAttentionModel(nn.Module):
         if kwargs.get("use_n_projection_layers"):
             attention_size = 2 * kwargs.get("hidden_size")
         else:
-            txt_encoder_h = cat.modelling_utils.get_output_dim(self.txt_encoder)
-            cls_encoder_h = cat.modelling_utils.get_output_dim(self.cls_encoder)
+            txt_encoder_h = get_output_dim(self.txt_encoder)
+            cls_encoder_h = get_output_dim(self.cls_encoder)
             attention_size = txt_encoder_h + cls_encoder_h
 
         n_attention_layers = kwargs.get("bahdanau_layers", 1)
@@ -203,3 +206,33 @@ class ClassAttentionModel(nn.Module):
     def _is_not_temperature(param_name):
         return "temperature" not in param_name
 
+
+class PreTrainedEmbeddingEncoder(nn.Module):
+    def __init__(self, embedding_matrix, word2id):
+        super().__init__()
+
+        self.vocab_size = embedding_matrix.shape[0]
+        self.emb_size = embedding_matrix.shape[1]
+        self.word2id = word2id
+
+        self.embedding = nn.Embedding(self.vocab_size, self.emb_size)
+
+    def forward(self, input_ids):
+        emb = self.embedding(input_ids)  # [batch_size, seq_len, hidden]
+
+        # we keep the dim to have the same interface as Transformer does
+        # sum is used for aggregation, because PAD is a zero vector
+        emb = torch.sum(emb, dim=1, keepdim=True)  # [batch_size, 1, hidden]
+
+        # Transformers return tuples, and we pretend to be one
+        return emb,
+
+
+def get_output_dim(model: [transformers.PreTrainedModel, PreTrainedEmbeddingEncoder]):
+    if isinstance(model, PreTrainedEmbeddingEncoder):
+        return model.emb_size
+
+    if isinstance(model.config, transformers.PretrainedConfig):
+        return model.config.hidden_size
+
+    raise ValueError(type(model))

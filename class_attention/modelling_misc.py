@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import class_attention.modelling
 from class_attention import modelling_utils
 
 
@@ -52,7 +53,7 @@ class EmbClassAttentionModel(nn.Module):
     def __init__(self, txt_encoder, n_classes, hidden_size, use_txt_out=True):
         super().__init__()
 
-        txt_encoder_h = modelling_utils.get_output_dim(txt_encoder)
+        txt_encoder_h = class_attention.modelling.get_output_dim(txt_encoder)
 
         self.use_txt_out = use_txt_out
         if not use_txt_out:

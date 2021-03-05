@@ -4,6 +4,7 @@ import torch
 import transformers
 
 import class_attention as cat
+import tests.utils
 
 
 @pytest.fixture()
@@ -26,6 +27,7 @@ def model():
     model = cat.ClassAttentionModel(text_encoder, label_encoder, hidden_size=7)
     return model
 
+
 @pytest.fixture()
 def bahdanau_model():
     text_encoder = transformers.AutoModel.from_config(
@@ -43,7 +45,9 @@ def bahdanau_model():
         )
     )
 
-    model = cat.ClassAttentionModel(text_encoder, label_encoder, hidden_size=7, attention_type="bahdanau")
+    model = cat.ClassAttentionModel(
+        text_encoder, label_encoder, hidden_size=7, attention_type="bahdanau"
+    )
     return model
 
 
@@ -89,3 +93,24 @@ def test_forward_bahdanau(bahdanau_model):
     out = bahdanau_model(x_dict, c_dict)
 
     assert out.shape == (2, 3)  # [batch_size, n_possible_classes]
+
+
+def test_glove_embedder():
+    tests.utils.make_glove_file()
+
+    emb_matrix, word2id = cat.utils.load_glove_from_file(tests.utils.GLOVE_TMP_PATH)
+    embedder = cat.modelling.PreTrainedEmbeddingEncoder(embedding_matrix=emb_matrix, word2id=word2id)
+    tests.utils.delete_glove_file()
+
+    test_input = torch.LongTensor([
+        [3, 12, 0],
+        [1, 0, 0],
+        [3, 45, 3],
+        [7, 0, 0],
+    ])
+    out = embedder(input_ids=test_input)
+
+    assert out is not None
+    assert isinstance(out, tuple)
+    assert len(out) == 1
+    assert out[0].shape == (4, 1, 3)

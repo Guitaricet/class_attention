@@ -68,7 +68,13 @@ def prepare_dataset(dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0)
 
 
 def prepare_dataloaders(
-    dataset_name_or_path, test_class_frac, batch_size, model_name, dataset_frac=1.0, num_workers=8
+    dataset_name_or_path,
+    test_class_frac,
+    batch_size,
+    model_name,
+    dataset_frac=1.0,
+    num_workers=8,
+    glove_path=None,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -79,6 +85,7 @@ def prepare_dataloaders(
         batch_size: batch size for the dataloadres
         model_name: str, used as AutoTokenizer.from_pretrained(model_name)
         num_workers: number of workers in each dataloader
+        glove_path: path to a GloVe file, these embeddings will be used as a label tokenizer
 
     Returns:
         tuple (train_dataloader, test_dataloader, all_classes_str, test_classes_str)
@@ -96,7 +103,12 @@ def prepare_dataloaders(
     ) = prepare_dataset(dataset_name_or_path, test_class_frac, dataset_frac)
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
-    label_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
+
+    if glove_path is not None:
+        _, word2id = cat.utils.load_glove_from_file(glove_path)
+        label_tokenizer = cat.utils.GloVeTokenizer(word2id)
+    else:
+        label_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
 
     # Datasets
     reduced_train_dataset = cat.CatDataset(
@@ -143,6 +155,14 @@ def prepare_dataloaders(
 
     data = {"train": reduced_train_set, "test": test_set}
     return train_dataloader, test_dataloader, all_classes_str, test_classes_str, data
+
+
+def make_label_encoder(model_name_or_path, glove=False):
+    if glove is not None:
+        emb_matrix, word2id = cat.utils.load_glove_from_file(glove)
+        return cat.modelling.PreTrainedEmbeddingEncoder(emb_matrix, word2id)
+
+    return transformers.AutoTokenizer.from_pretrained(model_name_or_path)
 
 
 def train_cat_model(

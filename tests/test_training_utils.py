@@ -1,8 +1,12 @@
+import os
+
 import pytest
 import torch
 import torch.utils.data
+import numpy as np
 
 import class_attention as cat
+import tests.utils
 
 
 DATASET = "Fraser/news-category-dataset"
@@ -37,6 +41,56 @@ def test_prepare_dataloaders():
         model_name="distilbert-base-uncased",
         dataset_frac=0.1,
     )
+
+    assert isinstance(train_dataloader, torch.utils.data.DataLoader)
+    assert isinstance(test_dataloader, torch.utils.data.DataLoader)
+    assert isinstance(train_dataloader.collate_fn, cat.CatCollator)
+    assert isinstance(test_dataloader.collate_fn, cat.CatTestCollator)
+    assert isinstance(all_classes_str, list)
+    assert isinstance(test_classes_str, list)
+    assert isinstance(all_classes_str[0], str)
+    assert isinstance(test_classes_str[0], str)
+    assert set(all_classes_str).issuperset(set(test_classes_str))
+    assert train_dataloader.dataset != test_dataloader.dataset[0]
+    assert isinstance(data, dict)
+    assert "train" in data
+    assert "test" in data
+
+
+def test_prepare_dataloaders_glove():
+    tests.utils.make_glove_file()
+
+    (
+        train_dataloader,
+        test_dataloader,
+        all_classes_str,
+        test_classes_str,
+        data,
+    ) = cat.training_utils.prepare_dataloaders(
+        dataset_name_or_path=DATASET,
+        test_class_frac=0.2,
+        batch_size=32,
+        model_name="distilbert-base-uncased",
+        dataset_frac=0.1,
+        glove_path=tests.utils.GLOVE_TMP_PATH,
+    )
+
+    tests.utils.delete_glove_file()
+
+    assert isinstance(train_dataloader.dataset.label_tokenizer, cat.utils.GloVeTokenizer)
+    assert isinstance(test_dataloader.dataset.label_tokenizer, cat.utils.GloVeTokenizer)
+
+    # we check glove tokenizer here too
+    glove_tokenizer = test_dataloader.dataset.label_tokenizer
+    out = glove_tokenizer.encode("arts")
+    assert isinstance(out, np.ndarray)
+
+    out = glove_tokenizer.encode("arts & culture")
+    assert out.shape == (3,)
+
+    out = glove_tokenizer.batch_encode_plus(["arts", "arts & culture"])
+    assert "input_ids" in out
+    assert out["input_ids"][0, 1] == 0, "padding failed or pad_id is not 0"
 
     assert isinstance(train_dataloader, torch.utils.data.DataLoader)
     assert isinstance(test_dataloader, torch.utils.data.DataLoader)

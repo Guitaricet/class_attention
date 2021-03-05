@@ -4,14 +4,6 @@ import torch.nn as nn
 import transformers
 
 
-def get_output_dim(model: transformers.PreTrainedModel):
-    # it looks like Transformers changed this in some version
-    # config = model.config
-    # if isinstance(config, transformers.DistilBertConfig):
-    #     return config.hidden_size
-    return model.config.hidden_size
-
-
 def validate_inputs(text_input_dict, labels_input_dict):
     if not isinstance(text_input_dict, dict):
         raise ValueError("text input should be a dict")
@@ -129,3 +121,30 @@ def get_small_transformer():
             num_attention_heads=2,
         )
     )
+
+
+# source: https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76
+def create_emb_layer(weights_matrix, non_trainable=False):
+
+    # ---
+
+    matrix_len = len(target_vocab)
+    weights_matrix = np.zeros((matrix_len, 50))
+    words_found = 0
+
+    for i, word in enumerate(target_vocab):
+        try:
+            weights_matrix[i] = glove[word]
+            words_found += 1
+        except KeyError:
+            weights_matrix[i] = np.random.normal(scale=0.6, size=(emb_dim,))
+
+    # ---
+
+    num_embeddings, embedding_dim = weights_matrix.size()
+    emb_layer = nn.Embedding(num_embeddings, embedding_dim)
+    emb_layer.load_state_dict({"weight": weights_matrix})
+    if non_trainable:
+        emb_layer.weight.requires_grad = False
+
+    return emb_layer, num_embeddings, embedding_dim

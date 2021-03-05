@@ -60,6 +60,8 @@ def parse_args(args=None):
                         help="number of layers in the bahdanau attention network")
     parser.add_argument("--no-bias", default=False, action="store_true",
                         help="do not use bias in added layers")
+    parser.add_argument("--glove", default=None, type=str,
+                        help="path to GloVe embeddings. Use them instead of transformer for class encoding.")
 
     # training
     parser.add_argument("--max-epochs", default=10, type=int)
@@ -139,7 +141,9 @@ def main(args):
         label_encoder = cat.modelling_utils.get_small_transformer()
     else:
         text_encoder = transformers.AutoModel.from_pretrained(args.model)
-        label_encoder = transformers.AutoModel.from_pretrained(args.model)
+        label_encoder = cat.training_utils.make_label_encoder(
+            model_name_or_path=args.model, glove=args.glove
+        )
 
     model = cat.ClassAttentionModel(
         text_encoder,
