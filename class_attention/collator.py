@@ -27,8 +27,12 @@ class CatCollator:
             raise ValueError("if p_classes > 0 possible_labels_ids should be specified")
 
         self.pad_token_id = pad_token_id
-        self.possible_labels_ids = possible_labels_ids
+        self.possible_labels = possible_labels_ids
         self.p_classes = p_classes
+
+        self._max_label_len = max(
+            len(label) for label in self.possible_labels
+        )
 
     def __call__(self, examples):
         """
@@ -54,6 +58,10 @@ class CatCollator:
         batch_size = len(examples)
         max_text_len = max(len(text) for text, label in examples)
         max_label_len = max(len(label) for text, label in examples)
+
+        if self.p_classes == 1:
+            max_label_len = self._max_label_len
+
         device = examples[0][0].device
 
         # we construct this tensor only to use it in the torch.unique operation, we do not return it
@@ -83,9 +91,9 @@ class CatCollator:
         # A: no, because the dataloader shuffles for us
 
         if self.p_classes == 1:
-            unique_labels = self.possible_labels_ids
+            unique_labels = self.possible_labels
             targets = get_index(
-                self.possible_labels_ids, _pre_batch_y
+                self.possible_labels, _pre_batch_y
             )
 
         return batch_x, unique_labels, targets
