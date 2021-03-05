@@ -12,6 +12,7 @@ import wandb
 
 import class_attention as cat
 
+
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -82,6 +83,7 @@ def parse_args(args=None):
     parser.add_argument("--predict-into-folder", default=None, type=str,
                         help="Specify this to save predictions into a bunch of files in this folder.")
     parser.add_argument("--tags", default=None)
+    parser.add_argument("--n-workers", default=8)
 
     args = parser.parse_args(args)
     args.device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -99,7 +101,7 @@ def parse_args(args=None):
             "Running in a debug mode, overriding dataset, tags, max_epochs, dataset_frac, and test_class_frac args"
         )
         args.dataset = DATASET
-        args.dataset_frac = 0.01
+        args.dataset_frac = 0.001
         args.test_class_frac = 0.2
         args.max_epochs = 2
         args.tags = ["debug"]
@@ -125,6 +127,7 @@ def main(args):
         dataset_frac=args.dataset_frac,
         batch_size=args.batch_size,
         p_training_classes=args.p_training_classes,
+        num_workers=args.n_workers,
     )
     wandb.config.test_classes = ",".join(sorted(test_classes_str))
 

@@ -167,7 +167,7 @@ def make_label_encoder(model_name_or_path, glove=False):
         emb_matrix, word2id = cat.utils.load_glove_from_file(glove)
         return cat.modelling.PreTrainedEmbeddingEncoder(emb_matrix, word2id)
 
-    return transformers.AutoTokenizer.from_pretrained(model_name_or_path)
+    return transformers.AutoModel.from_pretrained(model_name_or_path)
 
 
 def train_cat_model(
