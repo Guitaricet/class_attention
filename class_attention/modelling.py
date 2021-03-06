@@ -20,7 +20,7 @@ class ClassAttentionModel(nn.Module):
                 normalize_cls,
                 scale_attention,
                 remove_n_lowest_pc,
-                use_n_projection_layers,
+                n_projection_layers,
                 attention_type,
                 bahdanau_layers,
                 temperature,
@@ -37,21 +37,42 @@ class ClassAttentionModel(nn.Module):
 
         self.txt_out = nn.Identity()
         self.cls_out = nn.Identity()
+        self.cross_attention = nn.Identity()
 
-        use_n_projection_layers = self.kwargs.get("use_n_projection_layers", None)
-        if use_n_projection_layers is not None and use_n_projection_layers > 0:
+        dropout = kwargs.get("dropout", 0.0)
+        self.dropout_x = nn.Dropout(dropout ** 2)
+        self.dropout_c = nn.Dropout(dropout ** 2)
+        self.dropout_logits = nn.Dropout(dropout)
+
+        n_projection_layers = self.kwargs.get("n_projection_layers", None)
+        if n_projection_layers is not None and n_projection_layers > 0:
             hidden_size = self.kwargs["hidden_size"]  # guaranteed in validate_kwargs
             self.txt_out = cat.modelling_utils.make_mlp(
-                n_layers=use_n_projection_layers,
+                n_layers=n_projection_layers,
                 input_size=txt_encoder_h,
                 hidden_size=hidden_size,
                 use_bias=kwargs.get("use_bias", True),
+                dropout=dropout,
             )
             self.cls_out = cat.modelling_utils.make_mlp(
-                n_layers=use_n_projection_layers,
+                n_layers=n_projection_layers,
                 input_size=cls_encoder_h,
                 hidden_size=hidden_size,
                 use_bias=kwargs.get("use_bias", True),
+                dropout=dropout,
+            )
+
+        cross_attention_layers = self.kwargs.get("cross_attention_layers", None)
+        if cross_attention_layers is not None and cross_attention_layers > 0:
+            hidden_size = self.kwargs["hidden_size"]  # guaranteed in validate_kwargs
+            n_heads = self.kwargs["cross_attention_heads"]  # guaranteed in validate_kwargs
+            self.cross_attention = nn.ModuleList(
+                [
+                    ClassTransformerLayer(
+                        hidden=hidden_size, ffn_hidden=4 * hidden_size, n_heads=n_heads
+                    )
+                    for _ in range(cross_attention_layers)
+                ]
             )
 
         # make bahdanau attention
@@ -94,6 +115,9 @@ class ClassAttentionModel(nn.Module):
         h_x = self.txt_out(h_x)
         h_c = self.cls_out(h_c)
 
+        h_x = self.dropout_x(h_x)
+        h_c = self.dropout_c(h_c)
+
         if self.kwargs.get("remove_n_lowest_pc"):
             h_c = cat.modelling_utils.remove_smallest_princpial_component(
                 h_c, remove_n=self.kwargs.get("remove_n_lowest_pc")
@@ -122,6 +146,7 @@ class ClassAttentionModel(nn.Module):
             self.temperature.data.clamp_(math.log(1e-3), math.log(1e3))
 
         logits *= torch.exp(self.temperature)
+        logits = self.dropout_logits(logits)
 
         # fmt: off
         if wandb.run is not None and self.training:
@@ -138,17 +163,30 @@ class ClassAttentionModel(nn.Module):
         if kwargs is None:
             return
 
-        use_n_projection_layers = kwargs.get("use_n_projection_layers")
-        if use_n_projection_layers is not None and use_n_projection_layers < 1:
-            raise ValueError(use_n_projection_layers)
+        n_projection_layers = kwargs.get("n_projection_layers")
+        if n_projection_layers is not None and n_projection_layers < 1:
+            raise ValueError(n_projection_layers)
+
+        cross_attention_layers = kwargs.get("cross_attention_layers")
+        if cross_attention_layers is not None and cross_attention_layers < 1:
+            raise ValueError(cross_attention_layers)
 
         hidden_size = kwargs.get("hidden_size")
+        cross_attention_heads = kwargs.get("cross_attention_heads")
 
-        if use_n_projection_layers is not None:
-            if use_n_projection_layers < 0:
-                raise ValueError(use_n_projection_layers)
-            if use_n_projection_layers > 0 and hidden_size is None:
-                raise ValueError("hidden size should be specified with use_n_projection_layers")
+        if n_projection_layers is not None:
+            if n_projection_layers > 0 and hidden_size is None:
+                raise ValueError("hidden size should be specified with n_projection_layers")
+
+        if cross_attention_layers is not None and cross_attention_layers > 0:
+            if hidden_size is None:
+                raise ValueError("hidden size should be specified with cross_attention_layers")
+            if cross_attention_heads is None:
+                raise ValueError(
+                    "--cross-attention-heads should be specified with cross_attention_layers"
+                )
+            if hidden_size % cross_attention_heads != 0:
+                raise ValueError("hiden size should be divisible by --cross-attention-heads")
 
         if kwargs.get("share_txt_cls_network_params") and kwargs.get("freeze_cls_network"):
             raise ValueError(
@@ -158,7 +196,7 @@ class ClassAttentionModel(nn.Module):
 
     def make_bahdanau_attention(self, kwargs):
         # if we have a projection, our input size may be different
-        if kwargs.get("use_n_projection_layers"):
+        if kwargs.get("n_projection_layers"):
             attention_size = 2 * kwargs.get("hidden_size")
         else:
             txt_encoder_h = get_output_dim(self.txt_encoder)
@@ -225,7 +263,7 @@ class PreTrainedEmbeddingEncoder(nn.Module):
         emb = torch.sum(emb, dim=1, keepdim=True)  # [batch_size, 1, hidden]
 
         # Transformers return tuples, and we pretend to be one
-        return emb,
+        return (emb,)
 
 
 def get_output_dim(model: [transformers.PreTrainedModel, PreTrainedEmbeddingEncoder]):
@@ -236,3 +274,41 @@ def get_output_dim(model: [transformers.PreTrainedModel, PreTrainedEmbeddingEnco
         return model.config.hidden_size
 
     raise ValueError(type(model))
+
+
+class ClassTransformerLayer(nn.Module):
+    """Pre-norm version of transformer block with cross-attention
+
+    Why pre-norm: https://openreview.net/pdf?id=B1x8anVFPr
+    """
+
+    def __init__(self, hidden, ffn_hidden, n_heads=1, dropout=0.0):
+        super().__init__()
+        self.cross_attention = nn.modules.transformer.MultiheadAttention(
+            embed_dim=hidden,
+            num_heads=n_heads,
+            dropout=dropout,
+        )
+        self.ffn = nn.Sequential(
+            nn.Linear(hidden, ffn_hidden),
+            nn.Dropout(dropout),
+            nn.GELU(),
+            nn.Linear(ffn_hidden, hidden),
+        )
+        self.norm1 = nn.LayerNorm(hidden)
+        self.norm2 = nn.LayerNorm(hidden)
+
+    def forward(self, text_emb, class_emb):
+        residual = text_emb
+
+        x = self.norm1(text_emb)
+        x = self.cross_attention(query=x, key=class_emb, value=class_emb)
+        x = x + residual
+
+        residual = x
+
+        x = self.norm2(x)
+        x = self.ffn(x)
+        x = x + residual
+
+        return x

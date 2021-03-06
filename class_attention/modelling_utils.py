@@ -35,11 +35,21 @@ def normalize_embeds(embeds):
     return embeds / torch.sqrt(torch.sum(embeds * embeds, dim=1, keepdim=True))
 
 
-def make_mlp(n_layers, input_size, hidden_size, output_size=None, use_bias=True):
+def make_mlp(
+    n_layers,
+    input_size,
+    hidden_size,
+    output_size=None,
+    use_bias=True,
+    activation_fn=None,
+    dropout=0,
+):
     if not isinstance(n_layers, int):
         raise ValueError(f"n_layers should be int, got {type(n_layers)} instead")
     if n_layers < 1:
         raise ValueError(n_layers)
+    if activation_fn is None:
+        activation_fn = nn.ReLU
 
     output_size = output_size or hidden_size
 
@@ -50,7 +60,8 @@ def make_mlp(n_layers, input_size, hidden_size, output_size=None, use_bias=True)
         nn.Linear(input_size, hidden_size),
     ]
     for _ in range(n_layers - 2):
-        layers.append(nn.ReLU())
+        layers.append(nn.Dropout(dropout))
+        layers.append(activation_fn())
         layers.append(nn.Linear(hidden_size, hidden_size, bias=use_bias))
 
     layers.append(nn.Linear(hidden_size, output_size, bias=use_bias))
@@ -121,30 +132,3 @@ def get_small_transformer():
             num_attention_heads=2,
         )
     )
-
-
-# source: https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76
-def create_emb_layer(weights_matrix, non_trainable=False):
-
-    # ---
-
-    matrix_len = len(target_vocab)
-    weights_matrix = np.zeros((matrix_len, 50))
-    words_found = 0
-
-    for i, word in enumerate(target_vocab):
-        try:
-            weights_matrix[i] = glove[word]
-            words_found += 1
-        except KeyError:
-            weights_matrix[i] = np.random.normal(scale=0.6, size=(emb_dim,))
-
-    # ---
-
-    num_embeddings, embedding_dim = weights_matrix.size()
-    emb_layer = nn.Embedding(num_embeddings, embedding_dim)
-    emb_layer.load_state_dict({"weight": weights_matrix})
-    if non_trainable:
-        emb_layer.weight.requires_grad = False
-
-    return emb_layer, num_embeddings, embedding_dim

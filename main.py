@@ -52,9 +52,15 @@ def parse_args(args=None):
                         help="learn the softmax temperature as an additional scalar parameter")
     parser.add_argument("--remove-n-lowest-pc", default=0, type=int,
                         help="remove n lowest principal components from the class embeddings")
-    parser.add_argument("--use-n-projection-layers", default=None, type=int,
+    parser.add_argument("--n-projection-layers", default=None, type=int,
                         help="transform text embedding and class embedding using FCN with this many layers; "
                              "nonlinearity is not used if n=1")
+    parser.add_argument("--cross-attention-layers", default=None, type=int,
+                        help="apply cross-attention transformer blocks after projection layers "
+                             "to make texts and labels interact")
+    parser.add_argument("--cross-attention-heads", default=1, type=int,
+                        help="number of heads to use in cross-attention")
+
     parser.add_argument("--attention-type", default="dot-product",
                         choices=["dot-product", "bahdanau"])
     parser.add_argument("--bahdanau-layers", default=1, type=int,
@@ -68,6 +74,7 @@ def parse_args(args=None):
     parser.add_argument("--max-epochs", default=10, type=int)
     parser.add_argument("--batch-size", default=32, type=int)
     parser.add_argument("--lr", default=1e-4, type=float)
+    parser.add_argument("--dropout", default=0.1, type=float)
     parser.add_argument("--freeze-projections", default=False, action="store_true",
                         help="do not train cls_out and txt_out")
     parser.add_argument("--freeze-cls-network", default=False, action="store_true")

@@ -30,9 +30,8 @@ class CatCollator:
         self.possible_labels = possible_labels_ids
         self.p_classes = p_classes
 
-        self._max_label_len = max(
-            len(label) for label in self.possible_labels
-        )
+        if self.possible_labels is not None:
+            self._max_label_len = max(len(label) for label in self.possible_labels)
 
     def __call__(self, examples):
         """
@@ -92,9 +91,7 @@ class CatCollator:
 
         if self.p_classes == 1:
             unique_labels = self.possible_labels
-            targets = get_index(
-                self.possible_labels, _pre_batch_y
-            )
+            targets = get_index(self.possible_labels, _pre_batch_y)
 
         return batch_x, unique_labels, targets
 
