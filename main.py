@@ -197,7 +197,7 @@ def main(args):
         device=args.device,
         predict_into_file=predict_into_file,
         early_stopping=args.early_stopping,
-        save_path=args.save_path,
+        save_path=args.save_to,
     )
 
     if args.predict_into_folder is not None:
