@@ -52,35 +52,7 @@ def bahdanau_model():
 
 @pytest.fixture()
 def cross_attention_model():
-    return model_factory(model_kwargs={"cross_attention_layers": 1})
-
-
-@pytest.fixture()
-def cross_attention_model():
-    text_encoder = transformers.AutoModel.from_config(
-        transformers.BertConfig(
-            hidden_size=32,
-            num_hidden_layers=2,
-            intermediate_size=64,
-            num_attention_heads=4,
-            hidden_dropout_prob=0,
-            attention_probs_dropout_prob=0,
-        )
-    )
-    label_encoder = transformers.AutoModel.from_config(
-        transformers.BertConfig(
-            vocab_size=50,
-            hidden_size=32,
-            num_hidden_layers=2,
-            intermediate_size=64,
-            num_attention_heads=4,
-            hidden_dropout_prob=0,
-            attention_probs_dropout_prob=0,
-        )
-    )
-
-    model = cat.ClassAttentionModel(text_encoder, label_encoder, hidden_size=7)
-    return model
+    return model_factory(model_kwargs={"cross_attention_layers": 1, "cross_attention_heads": 1, "n_projection_layers": 1})
 
 
 def test_forward_random_input(model):

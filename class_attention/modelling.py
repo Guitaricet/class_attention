@@ -341,19 +341,34 @@ class ClassTransformerBlock(nn.Module):
         )
 
     def forward(self, text_emb, class_emb):
-        # multihead attention inside ClassTransformerLayer expects
-        # a tensor of shape [seq, batch, hidden]
-        # in our case batch always == 1
-        # because we interact each example from text_emb batch dimension
-        # with each class in the class_emb batch dimension
-        # and they effectively serve as seq dimensions and not batch dimensions
+        """
+
+        NOTE: Multihead attention inside ClassTransformerLayer expects
+        a tensor of shape [seq, batch, hidden]
+        in our case batch always == 1
+        because we interact each example from text_emb batch dimension
+        with each class in the class_emb batch dimension
+        and they effectively serve as seq dimensions and not batch dimensions
+
+        Args:
+            text_emb: FloatTensor[batch, 1, hidden] or FloatTensor[batch, hidden]
+            class_emb: FloatTensor[n_classes, 1, hidden] or FloatTensor[n_classes, hidden]
+
+        Returns:
+            FloatTensor of same shape as text_emb
+        """
+        should_squeeze = False
         if text_emb.dim() == 2:
             text_emb = text_emb.unsqueeze(1)
+            should_squeeze = True
         if class_emb.dim() == 2:
             class_emb = class_emb.unsqueeze(1)
 
         for layer in self.layers:
             text_emb = layer(text_emb=text_emb, class_emb=class_emb)
+
+        if should_squeeze:
+            text_emb = text_emb.squeeze(1)
 
         return text_emb
 
@@ -398,7 +413,8 @@ class ClassTransformerLayer(nn.Module):
         residual = text_emb
 
         x = self.norm1(text_emb)
-        x = self.cross_attention(query=x, key=class_emb, value=class_emb)
+        # multi-head attention returns tuple(attn_output, attn_output_weights(
+        x, _ = self.cross_attention(query=x, key=class_emb, value=class_emb)
         x = x + residual
 
         residual = x
