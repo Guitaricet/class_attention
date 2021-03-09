@@ -7,6 +7,9 @@ import transformers
 import class_attention as cat
 
 
+torch.manual_seed(93)
+
+
 @pytest.fixture()
 def random_model():
     random_text_encoder = transformers.BertModel(

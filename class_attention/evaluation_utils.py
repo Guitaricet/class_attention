@@ -125,7 +125,9 @@ def evaluate_model(
     return res
 
 
-def predict(model, dataloader, labels_str, device, return_texts=False, progress_bar=False) -> (List, List, List):
+def predict(
+    model, dataloader, labels_str, device, return_texts=False, progress_bar=False
+) -> (List, List, List):
     """Makes predictions on dataloader, reports metrics.
 
     Args:

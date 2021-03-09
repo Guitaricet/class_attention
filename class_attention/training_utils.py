@@ -162,16 +162,8 @@ def prepare_dataloaders(
     return train_dataloader, test_dataloader, all_classes_str, test_classes_str, data
 
 
-def make_label_encoder(model_name_or_path, glove=False):
-    if glove is not None:
-        emb_matrix, word2id = cat.utils.load_glove_from_file(glove)
-        return cat.modelling.PreTrainedEmbeddingEncoder(emb_matrix, word2id)
-
-    return transformers.AutoModel.from_pretrained(model_name_or_path)
-
-
 def train_cat_model(
-    model,
+    model: cat.ClassAttentionModel,
     optimizer,
     train_dataloader,
     test_dataloader,
@@ -180,7 +172,18 @@ def train_cat_model(
     max_epochs,
     device=None,
     predict_into_file=None,
+    early_stopping=None,
+    save_path=None,
 ):
+    patience = 0
+    monitor_name = "eval/F1_macro"
+    best_monitor = 0
+
+    if save_path is None and early_stopping is not None:
+        logger.warning(
+            "No save path is provided, early stopping will not load the best model after training"
+        )
+
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -237,6 +240,29 @@ def train_cat_model(
         if wandb.run is not None:
             wandb.log(metrics)
 
+        # Early stopping
+        if early_stopping is not None:
+            monitor = metrics[monitor_name]
+            if monitor > best_monitor:
+                patience = 0
+                best_monitor = monitor
+                if save_path is not None:
+                    model.save(
+                        file_path=save_path,
+                        optimizer=optimizer,
+                        epoch=epoch,
+                        global_step=global_step,
+                    )
+            else:
+                patience += 1
+                if patience > early_stopping:
+                    break
+
+    if early_stopping is not None and save_path is not None:
+        logger.info(f"Loading the best model, expecting {monitor_name} to be {best_monitor}")
+        state_dict = torch.load(save_path)["model_state_dict"]
+        model.load_state_dict(state_dict)
+
     return model
 
 
@@ -252,3 +278,11 @@ def validate_dataloader(dataloader: DataLoader, test_classes, is_test=False):
         assert set(dataset.labels).issuperset(set(test_classes))
     else:
         assert set(dataset.labels).isdisjoint(set(test_classes))
+
+
+def make_label_encoder(model_name_or_path, glove=False):
+    if glove is not None:
+        emb_matrix, word2id = cat.utils.load_glove_from_file(glove)
+        return cat.modelling.PreTrainedEmbeddingEncoder(emb_matrix, word2id)
+
+    return transformers.AutoModel.from_pretrained(model_name_or_path)

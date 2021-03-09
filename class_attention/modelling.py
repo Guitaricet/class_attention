@@ -82,6 +82,53 @@ class ClassAttentionModel(nn.Module):
             torch.tensor(initial_temperature, requires_grad=kwargs.get("learn_temperature", False))
         )
 
+    @classmethod
+    def from_kwargs(cls, **kwargs):
+        if kwargs.get("debug", False):
+            raise ValueError("Debug mode is not supported in .from_kwargs")
+
+        text_encoder = transformers.AutoModel.from_pretrained(kwargs["model"])
+        label_encoder = cat.modelling_utils.make_label_encoder(
+            model_name_or_path=kwargs["model"],
+            glove=kwargs.get("glove"),
+        )
+
+        return cat.ClassAttentionModel(
+            text_encoder,
+            label_encoder,
+            **kwargs,
+        )
+
+    @classmethod
+    def get_state_dict_from_checkpoint(cls, checkpoint_path, map_location="cpu"):
+        state_dict = torch.load(checkpoint_path, map_location=map_location)
+        model_state_dict = state_dict["model_state_dict"]
+        return model_state_dict
+
+    def load_state_dict_from_checkpoint(self, checkpoint_path):
+        model_state_dict = self.get_state_dict_from_checkpoint(checkpoint_path)
+        self.load_state_dict(model_state_dict, strict=True)
+
+    def save(self, file_path, optimizer=None, **kwargs):
+        """Saves model, model args and additional stuff to a file
+
+        Args:
+            file_path: path to a .torch file
+            optimizer: saves optimizer state_dict if provided
+            **kwargs: additional artuments
+        """
+
+        checkpoint = {
+            "model_state_dict": self.state_dict(),
+            "model_args": self.kwargs,
+            **kwargs,
+        }
+
+        if optimizer is not None:
+            checkpoint["optimizer_state_dict"] = optimizer.state_dict()
+
+        torch.save(checkpoint, file_path)
+
     def forward(self, text_input, labels_input):
         """
         Compute logits for input (input_dict,) corresponding to the classes (classes_dict)
@@ -294,6 +341,17 @@ class ClassTransformerBlock(nn.Module):
         )
 
     def forward(self, text_emb, class_emb):
+        # multihead attention inside ClassTransformerLayer expects
+        # a tensor of shape [seq, batch, hidden]
+        # in our case batch always == 1
+        # because we interact each example from text_emb batch dimension
+        # with each class in the class_emb batch dimension
+        # and they effectively serve as seq dimensions and not batch dimensions
+        if text_emb.dim() == 2:
+            text_emb = text_emb.unsqueeze(1)
+        if class_emb.dim() == 2:
+            class_emb = class_emb.unsqueeze(1)
+
         for layer in self.layers:
             text_emb = layer(text_emb=text_emb, class_emb=class_emb)
 
@@ -323,6 +381,20 @@ class ClassTransformerLayer(nn.Module):
         self.norm2 = nn.LayerNorm(hidden)
 
     def forward(self, text_emb, class_emb):
+        """Note that text_emb and class_emb should have an empty dimension at index 1 for efficient computation.
+
+        Args:
+            text_emb: torch.FloatTensor[batch_size, 1, hidden]
+            class_emb: torch.FloatTensor[n_classes, 1, hidden]
+
+        Returns:
+
+        """
+        if text_emb.dim() != 3:
+            raise ValueError(text_emb.shape)
+        if class_emb.dim() != 3:
+            raise ValueError(class_emb.shape)
+
         residual = text_emb
 
         x = self.norm1(text_emb)
