@@ -37,7 +37,7 @@ class ClassAttentionModel(nn.Module):
 
         self.txt_out = nn.Identity()
         self.cls_out = nn.Identity()
-        self.cross_attention = nn.Identity()
+        self.class_transformer = None
 
         dropout = kwargs.get("dropout", 0.0)
         self.dropout_x = nn.Dropout(dropout ** 2)
@@ -66,13 +66,11 @@ class ClassAttentionModel(nn.Module):
         if cross_attention_layers is not None and cross_attention_layers > 0:
             hidden_size = self.kwargs["hidden_size"]  # guaranteed in validate_kwargs
             n_heads = self.kwargs["cross_attention_heads"]  # guaranteed in validate_kwargs
-            self.cross_attention = nn.ModuleList(
-                [
-                    ClassTransformerLayer(
-                        hidden=hidden_size, ffn_hidden=4 * hidden_size, n_heads=n_heads
-                    )
-                    for _ in range(cross_attention_layers)
-                ]
+            self.class_transformer = ClassTransformerBlock(
+                n_layers=cross_attention_layers,
+                hidden=hidden_size,
+                ffn_hidden=4 * hidden_size,
+                n_heads=n_heads,
             )
 
         # make bahdanau attention
@@ -117,6 +115,9 @@ class ClassAttentionModel(nn.Module):
 
         h_x = self.dropout_x(h_x)
         h_c = self.dropout_c(h_c)
+
+        if self.class_transformer is not None:
+            h_x = self.class_transformer(text_emb=h_x, class_emb=h_c)
 
         if self.kwargs.get("remove_n_lowest_pc"):
             h_c = cat.modelling_utils.remove_smallest_princpial_component(
@@ -274,6 +275,29 @@ def get_output_dim(model: [transformers.PreTrainedModel, PreTrainedEmbeddingEnco
         return model.config.hidden_size
 
     raise ValueError(type(model))
+
+
+class ClassTransformerBlock(nn.Module):
+    def __init__(self, n_layers, hidden, ffn_hidden, n_heads=1, dropout=0.0):
+        super().__init__()
+
+        self.layers = nn.ModuleList(
+            [
+                ClassTransformerLayer(
+                    hidden=hidden,
+                    ffn_hidden=ffn_hidden,
+                    n_heads=n_heads,
+                    dropout=dropout,
+                )
+                for _ in range(n_layers)
+            ]
+        )
+
+    def forward(self, text_emb, class_emb):
+        for layer in self.layers:
+            text_emb = layer(text_emb=text_emb, class_emb=class_emb)
+
+        return text_emb
 
 
 class ClassTransformerLayer(nn.Module):
