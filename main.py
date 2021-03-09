@@ -136,7 +136,7 @@ def main(args):
         p_training_classes=args.p_training_classes,
         num_workers=args.n_workers,
     )
-    wandb.config.test_classes = ",".join(sorted(test_classes_str))
+    wandb.config.update({"test_classes": ", ".join(sorted(test_classes_str))}, allow_val_change=True)
 
     cat.training_utils.validate_dataloader(test_dataloader, test_classes_str, is_test=True)
     cat.training_utils.validate_dataloader(train_dataloader, test_classes_str, is_test=False)

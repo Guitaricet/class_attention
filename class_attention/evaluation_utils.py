@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 
-from typing import Union
+from typing import Union, List
 
 import pandas as pd
 import torch
@@ -41,47 +41,52 @@ def evaluate_model(
         dataloader: pytorch DataLoader with CatTestCollator
         labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_labels
         zeroshot_labels: if provided, additional metrics will be computed on this set of labels
+
+    Example output:
+    {
+        'eval/acc': 0.25,
+        'eval/P_macro': 0.08333333125000005,
+        'eval/R_macro': 0.33333330000000333,
+        'eval/F1_macro': 0.13333331733333392,
+        'eval_per_class/Weather/P': 0.24999999375000015,
+        'eval_per_class/Sport/P': 0.0,
+        'eval_per_class/My News/P': 0.0,
+        'eval_per_class/Weather/R': 0.9999999000000099,
+        'eval_per_class/Sport/R': 0.0,
+        'eval_per_class/My News/R': 0.0,
+        'eval_per_class/Weather/F1': 0.39999995200000177,
+        'eval_per_class/Sport/F1': 0.0,
+        'eval_per_class/My News/F1': 0.0,
+        'zero_shot_eval/acc': 0.0,
+        'zero_shot_eval/P_macro': 0.0,
+        'zero_shot_eval/R_macro': 0.0,
+        'zero_shot_eval/F1_macro': 0.0,
+        'multi_shot_eval/acc': 0.5,
+        'multi_shot_eval/P_macro': 0.24999998750000066,
+        'multi_shot_eval/R_macro': 0.49999995000000497,
+        'multi_shot_eval/F1_macro': 0.3333332888888915
+    }
     """
     if predict_into_file is not None and not isinstance(
         dataloader.sampler, torch.utils.data.sampler.SequentialSampler
     ):
         raise ValueError("test dataloader should not be shuffled")
 
-    model = model.to(device)
-    model.eval()
-
     if zeroshot_labels is not None and (not set(zeroshot_labels).issubset(labels_str)):
         raise ValueError("labels_str should include all labels")
 
-    all_predictions = []
-    all_labels = []
-    all_texts = []
-    text_tokenizer = dataloader.dataset.text_tokenizer
-
-    if progress_bar:
-        dataloader = tqdm(dataloader, desc="Evaluation")
-
-    with torch.no_grad():
-        for x, c, y in dataloader:
-            # Note: `c` does not change in CatTestCollator
-            x, c, y = x.to(device), c.to(device), y.to(device)
-
-            logits = model(x, c)
-
-            _, preds = logits.max(-1)
-
-            predicted_labels = [labels_str[i] for i in preds]
-            expected_labels = [labels_str[i] for i in y]
-
-            all_predictions += predicted_labels
-            all_labels += expected_labels
-            if predict_into_file is not None:
-                # NOTE: this may cause concurrency issues or semaphore failures if tokenizer parallelism is not disabled
-                all_texts += text_tokenizer.batch_decode(x, skip_special_tokens=True)
+    all_predictions, all_labels, all_texts = predict(
+        model=model,
+        dataloader=dataloader,
+        labels_str=labels_str,
+        device=device,
+        return_texts=(predict_into_file is not None),
+        progress_bar=progress_bar,
+    )
 
     if predict_into_file is not None:
         assert (
-            len(all_texts) == len(all_predictions) == len(expected_labels)
+            len(all_texts) == len(all_predictions) == len(all_labels)
         ), f"{len(all_texts)} texts, {len(all_predictions)} preds, {len(all_labels)} labels"
 
         dataframe = pd.DataFrame(
@@ -118,6 +123,53 @@ def evaluate_model(
 
     model.train()
     return res
+
+
+def predict(model, dataloader, labels_str, device, return_texts=False, progress_bar=False) -> (List, List, List):
+    """Makes predictions on dataloader, reports metrics.
+
+    Args:
+        model: ClassAttentionModel
+        dataloader: pytorch DataLoader with CatTestCollator
+        labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_labels
+        return_texts: if provided, the last element of the return tuple will be a list of classified texts
+        progress_bar: use tqdm during prediction
+
+    Returns:
+        tuple (all_predictions, all_labels, all_texts) where everything
+        is a list of strings
+    """
+
+    model = model.to(device)
+    model.eval()
+
+    all_predictions = []
+    all_labels = []
+    all_texts = [] if return_texts else None
+    text_tokenizer = dataloader.dataset.text_tokenizer
+
+    if progress_bar:
+        dataloader = tqdm(dataloader, desc="Evaluation")
+
+    with torch.no_grad():
+        for x, c, y in dataloader:
+            # Note: `c` does not change in CatTestCollator
+            x, c, y = x.to(device), c.to(device), y.to(device)
+
+            logits = model(x, c)
+
+            _, preds = logits.max(-1)
+
+            predicted_labels = [labels_str[i] for i in preds]
+            expected_labels = [labels_str[i] for i in y]
+
+            all_predictions += predicted_labels
+            all_labels += expected_labels
+            if return_texts:
+                # NOTE: this may cause concurrency issues or semaphore failures if tokenizer parallelism is not disabled
+                all_texts += text_tokenizer.batch_decode(x, skip_special_tokens=True)
+
+    return all_predictions, all_labels, all_texts
 
 
 def evaluate_model_on_subset(
