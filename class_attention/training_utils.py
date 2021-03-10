@@ -264,7 +264,7 @@ def train_cat_model(
 
                 logits = model(extra_x, all_c)
 
-                neg_entropy = F.softmax(logits) * F.log_softmax(logits)
+                neg_entropy = F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)
                 neg_entropy = torch.sum(neg_entropy) / examples_batch_size
                 examples_entropy_loss = examples_entropy_reg * neg_entropy
                 total_loss += examples_entropy_loss
@@ -286,7 +286,7 @@ def train_cat_model(
 
                 logits = model(x, extra_c)
 
-                neg_entropy = F.softmax(logits) * F.log_softmax(logits)
+                neg_entropy = F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)
                 neg_entropy = torch.sum(neg_entropy) / n_classes
                 classes_entropy_loss = classes_entropy_reg * neg_entropy
                 total_loss += classes_entropy_loss
