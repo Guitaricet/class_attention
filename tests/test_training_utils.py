@@ -13,6 +13,18 @@ torch.manual_seed(41)
 DATASET = "Fraser/news-category-dataset"
 
 
+def default_prepare_dataloaders(**kwargs):
+    return cat.training_utils.prepare_dataloaders(
+        dataset_name_or_path=DATASET,
+        test_class_frac=0.2,
+        batch_size=8,
+        model_name="distilbert-base-uncased",
+        dataset_frac=0.001,
+        num_workers=0,
+        **kwargs,
+    )
+
+
 def test_prepare_dataset():
     reduced_train_set, test_set, all_classes, test_classes = cat.training_utils.prepare_dataset(
         dataset_name_or_path=DATASET,
@@ -35,13 +47,7 @@ def test_prepare_dataloaders():
         all_classes_str,
         test_classes_str,
         data,
-    ) = cat.training_utils.prepare_dataloaders(
-        dataset_name_or_path=DATASET,
-        test_class_frac=0.2,
-        batch_size=32,
-        model_name="distilbert-base-uncased",
-        dataset_frac=0.1,
-    )
+    ) = default_prepare_dataloaders()
 
     assert isinstance(train_dataloader, torch.utils.data.DataLoader)
     assert isinstance(test_dataloader, torch.utils.data.DataLoader)
@@ -67,12 +73,7 @@ def test_prepare_dataloaders_glove():
         all_classes_str,
         test_classes_str,
         data,
-    ) = cat.training_utils.prepare_dataloaders(
-        dataset_name_or_path=DATASET,
-        test_class_frac=0.2,
-        batch_size=32,
-        model_name="distilbert-base-uncased",
-        dataset_frac=0.1,
+    ) = default_prepare_dataloaders(
         glove_path=tests.utils.GLOVE_TMP_PATH,
     )
 
@@ -108,7 +109,7 @@ def test_prepare_dataloaders_glove():
     assert "test" in data
 
 
-def test_training_pipeline():
+def test_train_cat_model():
     # this test becomes VERY slow if num_workers > 0
     (
         train_dataloader,
@@ -116,14 +117,7 @@ def test_training_pipeline():
         all_classes_str,
         test_classes_str,
         data,
-    ) = cat.training_utils.prepare_dataloaders(
-        dataset_name_or_path=DATASET,
-        test_class_frac=0.2,
-        batch_size=8,
-        model_name="distilbert-base-uncased",
-        dataset_frac=0.001,
-        num_workers=0,
-    )
+    ) = default_prepare_dataloaders()
 
     text_encoder = cat.modelling_utils.get_small_transformer()
     label_encoder = cat.modelling_utils.get_small_transformer()
@@ -143,3 +137,60 @@ def test_training_pipeline():
         max_epochs=3,
         device="cpu",
     )
+
+
+def test_train_cat_model_class_reg():
+    # this test becomes VERY slow if num_workers > 0
+    tests.utils.make_glove_file()
+    (
+        train_dataloader,
+        test_dataloader,
+        all_classes_str,
+        test_classes_str,
+        data,
+    ) = default_prepare_dataloaders(glove_path=tests.utils.GLOVE_TMP_PATH)
+
+    text_encoder = cat.modelling_utils.get_small_transformer()
+    emb_matrix, word2id = cat.utils.load_glove_from_file(tests.utils.GLOVE_TMP_PATH)
+    label_encoder = cat.modelling.PreTrainedEmbeddingEncoder(emb_matrix, word2id)
+
+    extra_classes_dataloader = cat.training_utils.make_extra_classes_dataloader_from_glove(
+        tests.utils.GLOVE_TMP_PATH, batch_size=4,
+    )
+
+    tests.utils.delete_glove_file()
+
+    model = cat.ClassAttentionModel(
+        text_encoder,
+        label_encoder,
+        n_projection_layers=1,
+        hidden_size=13,
+    )
+    optimizer = torch.optim.Adam(model.get_trainable_parameters(), lr=1e-4)
+
+    cat.training_utils.train_cat_model(
+        model=model,
+        optimizer=optimizer,
+        train_dataloader=train_dataloader,
+        test_dataloader=test_dataloader,
+        all_classes_str=all_classes_str,
+        test_classes_str=test_classes_str,
+        max_epochs=1,
+        device="cpu",
+        extra_classes_dataloader=extra_classes_dataloader,
+        classes_entropy_reg=1.0,
+    )
+
+
+def test_make_extra_classes_dataloader_from_glove():
+    tests.utils.make_glove_file()
+
+    dataloader = cat.training_utils.make_extra_classes_dataloader_from_glove(
+        tests.utils.GLOVE_TMP_PATH, batch_size=7
+    )
+    tests.utils.delete_glove_file()
+
+    batch = next(iter(dataloader))
+
+    assert isinstance(batch, torch.Tensor)
+    assert batch.shape == (7, 1)  # figure out the numbers

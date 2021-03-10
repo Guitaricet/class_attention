@@ -25,7 +25,9 @@ logging.basicConfig(
 logger = logging.getLogger(os.path.basename(__file__))
 
 
-def prepare_dataset(dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0, return_zero_shot_examples=False):
+def prepare_dataset(
+    dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0, return_zero_shot_examples=False
+):
     news_dataset = cat.utils.get_dataset_by_name_or_path(dataset_name_or_path)
     train_set = news_dataset["train"]
     test_set = news_dataset["validation"]
@@ -69,7 +71,13 @@ def prepare_dataset(dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0,
         logger.warning(f"Less than two zero-shot classes in the split: {zero_shot_classes}")
 
     if return_zero_shot_examples:
-        return train_set, test_set, list(all_classes), list(zero_shot_classes), zero_shot_examples_set
+        return (
+            train_set,
+            test_set,
+            list(all_classes),
+            list(zero_shot_classes),
+            zero_shot_examples_set,
+        )
 
     return train_set, test_set, list(all_classes), list(zero_shot_classes)
 
@@ -111,7 +119,9 @@ def prepare_dataloaders(
         all_classes_str,
         test_classes_str,
         zero_shot_examples,
-    ) = prepare_dataset(dataset_name_or_path, test_class_frac, dataset_frac, return_zero_shot_examples=True)
+    ) = prepare_dataset(
+        dataset_name_or_path, test_class_frac, dataset_frac, return_zero_shot_examples=True
+    )
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
 
@@ -180,12 +190,31 @@ def prepare_dataloaders(
             batch_size=batch_size,
             collate_fn=train_collator,
             num_workers=num_workers,
-            shuffle=True
+            shuffle=True,
         )
 
-        return train_dataloader, test_dataloader, all_classes_str, test_classes_str, data, zero_shot_examples_dataloader
+        return (
+            train_dataloader,
+            test_dataloader,
+            all_classes_str,
+            test_classes_str,
+            data,
+            zero_shot_examples_dataloader,
+        )
 
     return train_dataloader, test_dataloader, all_classes_str, test_classes_str, data
+
+
+def make_extra_classes_dataloader_from_glove(
+    glove_path,
+    batch_size,
+):
+    _, word2id = cat.utils.load_glove_from_file(glove_path)
+    words = cat.utils.filter_words(word2id.keys(), extra_filter=lambda x: x != "[PAD]")
+    label_tokenizer = cat.utils.GloVeTokenizer(word2id)
+    words_dataset = cat.CatDataset(words, label_tokenizer)
+    dataloader = DataLoader(words_dataset, batch_size=batch_size, shuffle=True)
+    return dataloader
 
 
 def train_cat_model(
@@ -281,7 +310,7 @@ def train_cat_model(
                 #     1. Look at the math
                 #     2. Intuition of this regularization is that
                 #     the model should not prefer any class for the example from a set of wrong classes
-                _, extra_c = next(extra_classes_dataloader)
+                extra_c = next(extra_classes_dataloader)
                 extra_c = extra_c.to(device)
                 n_classes = extra_c.shape[0]
 
@@ -336,7 +365,9 @@ def train_cat_model(
             else:
                 patience += 1
                 if patience > early_stopping:
-                    logger.info(f"The target metric did not improve over {patience} iterations. Stopping early.")
+                    logger.info(
+                        f"The target metric did not improve over {patience} iterations. Stopping early."
+                    )
                     break
 
     if early_stopping is not None and save_path is not None:

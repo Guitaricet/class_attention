@@ -138,6 +138,8 @@ class CatTestCollator:
     """
 
     def __init__(self, possible_labels_ids: torch.LongTensor, pad_token_id):
+        if not isinstance(possible_labels_ids, torch.LongTensor):
+            raise ValueError(f"possible labels should be LongTensor, got {type(possible_labels_ids)} instead")
         self.possible_labels = possible_labels_ids
         self.pad_token_id = pad_token_id
 

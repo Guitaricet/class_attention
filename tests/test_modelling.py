@@ -50,9 +50,16 @@ def model():
 def bahdanau_model():
     return model_factory(model_kwargs={"attention_type": bahdanau_model})
 
+
 @pytest.fixture()
 def cross_attention_model():
-    return model_factory(model_kwargs={"cross_attention_layers": 1, "cross_attention_heads": 1, "n_projection_layers": 1})
+    return model_factory(
+        model_kwargs={
+            "cross_attention_layers": 1,
+            "cross_attention_heads": 1,
+            "n_projection_layers": 1,
+        }
+    )
 
 
 def test_forward_random_input(model):

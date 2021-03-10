@@ -32,7 +32,7 @@ class GloVeTokenizer:
             raise ValueError("GloVeTokenizer only supports pad_token_id=0")
 
         self.word2id = word2id
-        self.pad_token_id = pad_token_id
+        self.pad_token_id = int(pad_token_id)
 
     def encode(self, text):
         # tokenizer.encode -> numpy tensor of shape [seq_len,]
@@ -50,7 +50,7 @@ class GloVeTokenizer:
         batch_size = len(batch)
         max_len = max(map(len, batch))
 
-        batch_pt = torch.ones(batch_size, max_len) * self.pad_token_id
+        batch_pt = torch.ones(batch_size, max_len, dtype=torch.int64) * self.pad_token_id
         for i, example in enumerate(batch):
             batch_pt[i, : len(example)] = torch.LongTensor(example)
 
@@ -240,3 +240,19 @@ def infinite_iterator(iterable):
     while True:
         for x in iter(iterable):
             yield x
+
+
+def extract_words_from_glove(glove_path):
+    with open(glove_path) as f:
+        words = [line.strip().split(" ", 1)[0] for line in f]
+
+    filtered_words = filter_words(words)
+    return filtered_words
+
+
+def filter_words(words, extra_filter=None):
+    res = [w for w in words if (not w.isdigit() and len(w) > 2 and "'" not in w)]
+    if extra_filter is not None:
+        res = [w for w in res if extra_filter(w)]
+
+    return res

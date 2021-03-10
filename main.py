@@ -119,6 +119,10 @@ def parse_args(args=None):
         args.max_epochs = 2
         args.tags = ["debug"]
 
+    if args.classes_entropy_reg is not None:
+        if args.glove is None:
+            raise NotImplementedError("--classes-entropy-reg is only supported in --glove mode")
+
     return args
 
 
@@ -194,8 +198,12 @@ def main(args):
         extra_kwargs["extra_examples_dataloader"] = zero_shot_dataloader
         extra_kwargs["examples_entropy_reg"] = args.examples_entropy_reg
     if args.classes_entropy_reg:
-        raise NotImplementedError()
-        # extra_kwargs["extra_classes_dataloader"] =
+        assert isinstance(label_encoder, cat.modelling.PreTrainedEmbeddingEncoder)
+        # fmt: off
+        extra_kwargs["extra_classes_dataloader"] = cat.training_utils.make_extra_classes_dataloader_from_glove(
+            args.glove, batch_size=args.batch_size // 2
+        )
+        # fmt: on
         extra_kwargs["classes_entropy_reg"] = args.classes_entropy_reg
 
     logger.info("Starting training")
