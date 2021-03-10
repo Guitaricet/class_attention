@@ -53,7 +53,15 @@ class CatCollator:
                 targets: LongTensor[batch_size,]
         """
         _validate_input(examples)
+        has_labels = bool(isinstance(examples[0], tuple) and len(examples[0]) > 1)
 
+        if has_labels:
+            return self._call_with_labels(examples)
+
+        assert isinstance(examples[0], torch.Tensor)
+        return self._call_without_labels(examples)
+
+    def _call_with_labels(self, examples):
         batch_size = len(examples)
         max_text_len = max(len(text) for text, label in examples)
         max_label_len = max(len(label) for text, label in examples)
@@ -82,9 +90,9 @@ class CatCollator:
             batch_x[i, : len(text)] = text
             _pre_batch_y[i, : len(label)] = label
 
-        # inverse is the mapping from unique_labels to the original _pre_batch_y indices
-        # and this is precisely our lables
-        unique_labels, targets = torch.unique(_pre_batch_y, dim=0, return_inverse=True)
+            # inverse is the mapping from unique_labels to the original _pre_batch_y indices
+            # and this is precisely our lables
+            unique_labels, targets = torch.unique(_pre_batch_y, dim=0, return_inverse=True)
 
         # Q: can/should we shuffle the targets and unique_labels here?
         # A: no, because the dataloader shuffles for us
@@ -94,6 +102,23 @@ class CatCollator:
             targets = get_index(self.possible_labels, _pre_batch_y)
 
         return batch_x, unique_labels, targets
+
+    def _call_without_labels(self, examples):
+        batch_size = len(examples)
+        max_text_len = max(map(len, examples))
+        device = examples[0][0].device
+
+        batch_x = torch.full(
+            size=[batch_size, max_text_len],
+            fill_value=self.pad_token_id,
+            dtype=torch.int64,
+            device=device,
+        )
+
+        for i, text in enumerate(examples):
+            batch_x[i, : len(text)] = text
+
+        return batch_x, self.possible_labels
 
 
 class CatTestCollator:
@@ -178,21 +203,22 @@ class CatTestCollator:
 
 
 def _validate_input(examples):
-    if not isinstance(examples[0], tuple):
+    if not isinstance(examples[0], tuple) and not isinstance(examples[0], torch.Tensor):
         raise ValueError(examples)
 
-    text_0, label_0 = examples[0]
-    if not len(text_0.shape) == 1:
-        raise ValueError(
-            f"Wrong number of dimensions in the text tensor. "
-            f"Expected a rank-one tensor, got rank-{len(text_0.shape)} instead"
-        )
+    if isinstance(examples[0], tuple):
+        text_0, label_0 = examples[0]
+        if not len(text_0.shape) == 1:
+            raise ValueError(
+                f"Wrong number of dimensions in the text tensor. "
+                f"Expected a rank-one tensor, got rank-{len(text_0.shape)} instead"
+            )
 
-    if not len(label_0.shape) == 1:
-        raise ValueError(
-            f"Wrong number of dimensions in the label tensor. "
-            f"Expected a rank-one tensor, got rank-{len(label_0.shape)} instead"
-        )
+        if not len(label_0.shape) == 1:
+            raise ValueError(
+                f"Wrong number of dimensions in the label tensor. "
+                f"Expected a rank-one tensor, got rank-{len(label_0.shape)} instead"
+            )
 
 
 # source: https://discuss.pytorch.org/t/how-to-get-the-row-index-of-specific-values-in-tensor/28036/7

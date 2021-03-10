@@ -25,7 +25,7 @@ logging.basicConfig(
 logger = logging.getLogger(os.path.basename(__file__))
 
 
-def prepare_dataset(dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0):
+def prepare_dataset(dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0, return_zero_shot_examples=False):
     news_dataset = cat.utils.get_dataset_by_name_or_path(dataset_name_or_path)
     train_set = news_dataset["train"]
     test_set = news_dataset["validation"]
@@ -49,10 +49,14 @@ def prepare_dataset(dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0)
                 f"Sampling size is too small for the *test* set, only {len(_test_classes)} left"
             )
 
+    zero_shot_examples_set = None
     if test_class_frac > 0.0:
-        train_set, _ = cat.utils.split_classes(
+        train_set, zero_shot_examples_set = cat.utils.split_classes(
             train_set, p_test_classes=test_class_frac, verbose=True
         )
+
+    if return_zero_shot_examples and test_class_frac == 0:
+        zero_shot_examples_set = news_dataset["zero_shot_examples"]
 
     train_classes = set(train_set["category"])
     test_classes = set(test_set["category"])
@@ -63,6 +67,9 @@ def prepare_dataset(dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0)
 
     if len(zero_shot_classes) < 2:
         logger.warning(f"Less than two zero-shot classes in the split: {zero_shot_classes}")
+
+    if return_zero_shot_examples:
+        return train_set, test_set, list(all_classes), list(zero_shot_classes), zero_shot_examples_set
 
     return train_set, test_set, list(all_classes), list(zero_shot_classes)
 
@@ -76,6 +83,7 @@ def prepare_dataloaders(
     num_workers=8,
     glove_path=None,
     p_training_classes=0,
+    return_zero_shot_examples=False,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -87,6 +95,7 @@ def prepare_dataloaders(
         model_name: str, used as AutoTokenizer.from_pretrained(model_name)
         num_workers: number of workers in each dataloader
         glove_path: path to a GloVe file, these embeddings will be used as a label tokenizer
+        return_zero_shot_examples: if True, returns an unlabeled dataset with examples of zero-shot classes
 
     Returns:
         tuple (train_dataloader, test_dataloader, all_classes_str, test_classes_str)
@@ -101,7 +110,8 @@ def prepare_dataloaders(
         test_set,
         all_classes_str,
         test_classes_str,
-    ) = prepare_dataset(dataset_name_or_path, test_class_frac, dataset_frac)
+        zero_shot_examples,
+    ) = prepare_dataset(dataset_name_or_path, test_class_frac, dataset_frac, return_zero_shot_examples=True)
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
 
@@ -159,6 +169,22 @@ def prepare_dataloaders(
     )
 
     data = {"train": reduced_train_set, "test": test_set}
+
+    if return_zero_shot_examples:
+        zero_shot_examples_dataset = cat.CatDataset(
+            zero_shot_examples["headline"],
+            text_tokenizer,
+        )
+        zero_shot_examples_dataloader = DataLoader(
+            zero_shot_examples_dataset,
+            batch_size=batch_size,
+            collate_fn=train_collator,
+            num_workers=num_workers,
+            shuffle=True
+        )
+
+        return train_dataloader, test_dataloader, all_classes_str, test_classes_str, data, zero_shot_examples_dataloader
+
     return train_dataloader, test_dataloader, all_classes_str, test_classes_str, data
 
 
@@ -174,6 +200,10 @@ def train_cat_model(
     predict_into_file=None,
     early_stopping=None,
     save_path=None,
+    extra_examples_dataloader=None,
+    examples_entropy_reg=None,
+    extra_classes_dataloader=None,
+    classes_entropy_reg=None,
 ):
     patience = 0
     monitor_name = "eval/F1_macro"
@@ -186,6 +216,14 @@ def train_cat_model(
 
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    if extra_examples_dataloader is not None:
+        assert examples_entropy_reg is not None
+        extra_examples_dataloader = cat.utils.infinite_iterator(extra_examples_dataloader)
+
+    if extra_classes_dataloader is not None:
+        assert classes_entropy_reg is not None
+        extra_classes_dataloader = cat.utils.infinite_iterator(extra_classes_dataloader)
 
     global_step = -1
 
@@ -206,7 +244,8 @@ def train_cat_model(
             c_dict = {"input_ids": c}
             logits = model(x_dict, c_dict)  # [batch_size, n_classes]
 
-            loss = F.cross_entropy(logits, y)
+            ce_loss = F.cross_entropy(logits, y)
+            total_loss = ce_loss
             # if args.double_loss:
             # similar to CLIP cross_entropy_loss(..., axis=0)
             # TODO: average text vectors with the same class
@@ -215,17 +254,54 @@ def train_cat_model(
             _, preds = logits.max(-1)
             acc = torch.sum(preds == y).float() / x.shape[0]
 
+            # Regularization
+            extra_wandb_logs = dict()
+            if extra_examples_dataloader is not None:
+                extra_x, all_c = next(extra_examples_dataloader)
+                examples_batch_size = extra_x.shape[0]
+
+                logits = model(extra_x, all_c)
+
+                neg_entropy = F.softmax(logits) * F.log_softmax(logits)
+                neg_entropy = torch.sum(neg_entropy) / examples_batch_size
+                examples_entropy_loss = examples_entropy_reg * neg_entropy
+                total_loss += examples_entropy_loss
+                extra_wandb_logs["train/extra_examples_entropy"] = -neg_entropy
+
+            if extra_classes_dataloader:
+                # NOTE: can we concat extra classes to the original `c`
+                # so you don't need to forward the model one more time?
+                #
+                # Use real data, but extra classes.
+                # Question: do we really need to sample real data?
+                # Answer: yes, because:
+                #     1. Look at the math
+                #     2. Intuition of this regularization is that
+                #     the model should not prefer any class for the example from a set of wrong classes
+                _, extra_c = next(extra_classes_dataloader)
+                n_classes = extra_c.shape[0]
+
+                logits = model(x, extra_c)
+
+                neg_entropy = F.softmax(logits) * F.log_softmax(logits)
+                neg_entropy = torch.sum(neg_entropy) / n_classes
+                classes_entropy_loss = classes_entropy_reg * neg_entropy
+                total_loss += classes_entropy_loss
+                extra_wandb_logs["train/extra_classes_entropy"] = -neg_entropy
+
             # fmt: off
             if wandb.run is not None:
                 wandb.log({
                     "train/acc": acc,
-                    "train/loss": loss,
+                    "train/loss": total_loss,
+                    "train/cross_entropy": ce_loss,
                     "train/epoch": epoch,
                     "global_step": global_step,
+                    **extra_wandb_logs,
                 })
             # fmt: on
 
-            loss.backward()
+            total_loss.backward()
             optimizer.step()
 
         # validation
@@ -256,6 +332,7 @@ def train_cat_model(
             else:
                 patience += 1
                 if patience > early_stopping:
+                    logger.info(f"The target metric did not improve over {patience} iterations. Stopping early.")
                     break
 
     if early_stopping is not None and save_path is not None:

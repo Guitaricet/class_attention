@@ -82,6 +82,10 @@ def parse_args(args=None):
     parser.add_argument("--p-training-classes", default=0, type=float,
                         help="proportion of classes to feed into the model during of training at every batch")
     parser.add_argument("--early-stopping", default=None, type=int)
+    parser.add_argument("--examples-entropy-reg", default=None, type=float,
+                        help="maximize the entropy of the predicted distribution on unknown **examples**")
+    parser.add_argument("--classes-entropy-reg", default=None, type=float,
+                        help="maximize the entropy of the predicted distribution on unknown **classes**")
 
     # misc
     parser.add_argument("--device", default=None)
@@ -99,9 +103,6 @@ def parse_args(args=None):
     args.tags = args.tags.split(",") if args.tags else []
 
     # fmt: on
-
-    if args.share_txt_cls_network_params:
-        raise NotImplementedError()
 
     args.use_bias = not args.no_bias
 
@@ -126,12 +127,14 @@ def main(args):
     logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
 
     logger.info("Creating dataloaders")
+    # TODO: use validation dataset as an unlabeled data source
     (
         train_dataloader,
         test_dataloader,
         all_classes_str,
         test_classes_str,
         data,
+        zero_shot_dataloader,  # only examples, no labels (but all examples belong to the test classes set)
     ) = cat.training_utils.prepare_dataloaders(
         dataset_name_or_path=args.dataset,
         model_name=args.model,
@@ -140,7 +143,9 @@ def main(args):
         batch_size=args.batch_size,
         p_training_classes=args.p_training_classes,
         num_workers=args.n_workers,
+        return_zero_shot_examples=True,
     )
+
     wandb.config.update(
         {"test_classes": ", ".join(sorted(test_classes_str))}, allow_val_change=True
     )
@@ -179,12 +184,21 @@ def main(args):
     wandb.watch(model, log="all")
     wandb.log({"model_description": wandb.Html(cat.utils.monospace_html(repr(model)))})
 
-    logger.info("Starting training")
-
     predict_into_file = None
     if args.predict_into_folder is not None:
         os.makedirs(args.predict_into_folder, exist_ok=True)
         predict_into_file = os.path.join(args.predict_into_folder, "predictions_all_classes.txt")
+
+    extra_kwargs = dict()
+    if args.examples_entropy_reg:
+        extra_kwargs["extra_examples_dataloader"] = zero_shot_dataloader
+        extra_kwargs["examples_entropy_reg"] = args.examples_entropy_reg
+    if args.classes_entropy_reg:
+        raise NotImplementedError()
+        # extra_kwargs["extra_classes_dataloader"] =
+        extra_kwargs["classes_entropy_reg"] = args.classes_entropy_reg
+
+    logger.info("Starting training")
 
     cat.training_utils.train_cat_model(
         model=model,
@@ -198,6 +212,7 @@ def main(args):
         predict_into_file=predict_into_file,
         early_stopping=args.early_stopping,
         save_path=args.save_to,
+        **extra_kwargs,
     )
 
     if args.predict_into_folder is not None:

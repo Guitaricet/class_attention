@@ -8,7 +8,8 @@ import numpy as np
 import class_attention as cat
 import tests.utils
 
-
+np.random.seed(8)
+torch.manual_seed(41)
 DATASET = "Fraser/news-category-dataset"
 
 

@@ -5,6 +5,7 @@ import sys
 from collections import Counter
 
 import torch
+import torch.utils.data
 import numpy as np
 
 import datasets
@@ -229,3 +230,13 @@ def load_glove_from_file(path):
     assert len(word2id) == embedding_matrix.shape[0]
 
     return embedding_matrix, word2id
+
+
+def infinite_iterator(iterable):
+    if isinstance(iterable, torch.utils.data.DataLoader):
+        if not isinstance(iterable.sampler, torch.utils.data.sampler.RandomSampler):
+            raise RuntimeError("this dataloader should use random sampling")
+
+    while True:
+        for x in iter(iterable):
+            yield x

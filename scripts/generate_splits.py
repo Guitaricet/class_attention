@@ -51,16 +51,18 @@ test_classes = [
     "EDUCATION",  # related to COLLEGE, SCIENCE,
 ]
 
-reduced_train_set, _ = cat.utils.split_classes(
+reduced_train_set, zero_shot_examples = cat.utils.split_classes(
     news_dataset["train"], test_classes=test_classes, verbose=True
 )
 
 news_dataset["train"] = reduced_train_set
+news_dataset["zero_shot_examples"] = zero_shot_examples
 news_dataset.save_to_disk("../data/news-category-semantic-split")
 
 p = 0.1
 news_dataset["train"] = cat.utils.sample_dataset(news_dataset["train"], p)
 news_dataset["validation"] = cat.utils.sample_dataset(news_dataset["validation"], p)
+news_dataset["zero_shot_examples"] = cat.utils.sample_dataset(news_dataset["zero_shot_examples"], p)
 news_dataset["test"] = cat.utils.sample_dataset(news_dataset["test"], p)
 
 news_dataset.save_to_disk("../data/news-category-semantic-split-small")
@@ -81,18 +83,20 @@ test_classes_random = [
     "EDUCATION",
     "TRAVEL",
 ]
-reduced_train_set, _ = cat.utils.split_classes(
+reduced_train_set, zero_shot_examples = cat.utils.split_classes(
     news_dataset["train"],
     test_classes=test_classes_random,
     verbose=True,
 )
 news_dataset["train"] = reduced_train_set
+news_dataset["zero_shot_examples"] = zero_shot_examples
 
 news_dataset.save_to_disk("../data/news-category-random-split")
 
 p = 0.1
 news_dataset["train"] = cat.utils.sample_dataset(news_dataset["train"], p)
 news_dataset["validation"] = cat.utils.sample_dataset(news_dataset["validation"], p)
+news_dataset["zero_shot_examples"] = cat.utils.sample_dataset(news_dataset["zero_shot_examples"], p)
 news_dataset["test"] = cat.utils.sample_dataset(news_dataset["test"], p)
 
 news_dataset.save_to_disk("../data/news-category-random-split-small")
@@ -102,6 +106,7 @@ news_dataset.save_to_disk("../data/news-category-random-split-small")
 p = 0.01
 news_dataset["train"] = cat.utils.sample_dataset(news_dataset["train"], p)
 news_dataset["validation"] = cat.utils.sample_dataset(news_dataset["validation"], p)
+news_dataset["zero_shot_examples"] = cat.utils.sample_dataset(news_dataset["zero_shot_examples"], p)
 news_dataset["test"] = cat.utils.sample_dataset(news_dataset["test"], p)
 
 news_dataset.save_to_disk("../data/news-category-random-split-tiny")
