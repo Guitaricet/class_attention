@@ -258,6 +258,8 @@ def train_cat_model(
             extra_wandb_logs = dict()
             if extra_examples_dataloader is not None:
                 extra_x, all_c = next(extra_examples_dataloader)
+                extra_x = extra_x.to(device)
+                all_c = all_c.to(device)
                 examples_batch_size = extra_x.shape[0]
 
                 logits = model(extra_x, all_c)
@@ -279,6 +281,7 @@ def train_cat_model(
                 #     2. Intuition of this regularization is that
                 #     the model should not prefer any class for the example from a set of wrong classes
                 _, extra_c = next(extra_classes_dataloader)
+                extra_c = extra_c.to(device)
                 n_classes = extra_c.shape[0]
 
                 logits = model(x, extra_c)
