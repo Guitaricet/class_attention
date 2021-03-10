@@ -244,8 +244,9 @@ def train_cat_model(
             c_dict = {"input_ids": c}
             logits = model(x_dict, c_dict)  # [batch_size, n_classes]
 
-            ce_loss = F.cross_entropy(logits, y)
-            total_loss = ce_loss
+            total_loss = F.cross_entropy(logits, y)
+            ce_loss = total_loss.detach().clone()  # used for logging
+
             # if args.double_loss:
             # similar to CLIP cross_entropy_loss(..., axis=0)
             # TODO: average text vectors with the same class
