@@ -86,6 +86,11 @@ def parse_args(args=None):
                         help="maximize the entropy of the predicted distribution on unknown **examples**")
     parser.add_argument("--classes-entropy-reg", default=None, type=float,
                         help="maximize the entropy of the predicted distribution on unknown **classes**")
+    parser.add_argument("--regularize-with-real-classes", default=False, action="store_true",
+                        help="use real zero-shot classes to maximize the entropy of P(Zero|x_Multi). "
+                             "Not practical, serves as oracle/sanity check.")
+    parser.add_argument("--classes-entropy-batch-size", default=None, type=int,
+                        help="the number of extra classes to compute the regularization term")
 
     # misc
     parser.add_argument("--device", default=None)
@@ -201,7 +206,9 @@ def main(args):
         assert isinstance(label_encoder, cat.modelling.PreTrainedEmbeddingEncoder)
         # fmt: off
         extra_kwargs["extra_classes_dataloader"] = cat.training_utils.make_extra_classes_dataloader_from_glove(
-            args.glove, batch_size=args.batch_size // 2
+            glove_path=args.glove,
+            batch_size=args.classes_entropy_batch_size or args.batch_size // 2,
+            class_names=all_classes_str if args.regularize_with_real_classes else None,
         )
         # fmt: on
         extra_kwargs["classes_entropy_reg"] = args.classes_entropy_reg
