@@ -153,6 +153,7 @@ def main(args):
         p_training_classes=args.p_training_classes,
         num_workers=args.n_workers,
         return_zero_shot_examples=True,
+        glove_path=args.glove,
     )
 
     wandb.config.update(
