@@ -198,7 +198,8 @@ class CatTestCollator:
 
         if batch_size != targets.shape[0]:
             raise RuntimeError(
-                f"Wrong number of targets. Expected {batch_size}, got {targets.shape[0]} instead."
+                f"Wrong number of targets. Expected {batch_size}, got {targets.shape[0]} instead.\n"
+                f"possible_labels: {self.possible_labels}\n _pre_batch_y: {_pre_batch_y}\n"
             )
 
         return batch_x, self.possible_labels, targets
