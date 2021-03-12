@@ -91,6 +91,8 @@ def parse_args(args=None):
                              "Not practical, serves as oracle/sanity check.")
     parser.add_argument("--classes-entropy-batch-size", default=None, type=int,
                         help="the number of extra classes to compute the regularization term")
+    parser.add_argument("--eval-every-steps", default=None, type=int,
+                        help="evaluate model each --eval-every-steps steps; does not affect early stopping")
 
     # misc
     parser.add_argument("--device", default=None)
@@ -163,7 +165,7 @@ def main(args):
     cat.training_utils.validate_dataloader(test_dataloader, test_classes_str, is_test=True)
     cat.training_utils.validate_dataloader(train_dataloader, test_classes_str, is_test=False)
 
-    logger.info(f"List of zero-shot classes: {', '.join(test_classes_str)}")
+    logger.info(f"List of classes in the test set: {', '.join(test_classes_str)}")
 
     if len(test_classes_str) < 2:
         logger.warning(f"Less than two zero-shot classes")
@@ -228,6 +230,7 @@ def main(args):
         predict_into_file=predict_into_file,
         early_stopping=args.early_stopping,
         save_path=args.save_to,
+        eval_every_steps=args.eval_every_steps,
         **extra_kwargs,
     )
 

@@ -216,6 +216,8 @@ def make_extra_classes_dataloader_from_glove(
         words = cat.utils.filter_words(word2id.keys(), extra_filter=lambda x: x != "[PAD]")
         words_dataset = cat.CatDataset(words, label_tokenizer)
     else:
+        # NOTE: some of the class names can have length > 1
+        # DataLoader won't be able to collate them with the default collator
         class_names = [c.lower() for c in class_names]
         words_dataset = cat.CatDataset(class_names, label_tokenizer)
 
@@ -239,6 +241,7 @@ def train_cat_model(
     examples_entropy_reg=None,
     extra_classes_dataloader=None,
     classes_entropy_reg=None,
+    eval_every_steps=None,
 ):
     patience = 0
     monitor_name = "eval/F1_macro"
@@ -317,6 +320,11 @@ def train_cat_model(
                 #     2. Intuition of this regularization is that
                 #     the model should not prefer any class for the example from a set of wrong classes
                 extra_c = next(extra_classes_dataloader)
+                if extra_c.shape[0] == 1:
+                    logger.warning("Number of possible classes is 1, sampling from extra_classes_dataloader again")
+                    # TODO: awful hack, what if the ampling is bad again?
+                    extra_c = next(extra_classes_dataloader)
+
                 extra_c = extra_c.to(device)
                 n_classes = extra_c.shape[0]
 
@@ -328,20 +336,33 @@ def train_cat_model(
                 total_loss += classes_entropy_loss
                 extra_wandb_logs["train/extra_classes_entropy"] = -neg_entropy
 
-            # fmt: off
             if wandb.run is not None:
-                wandb.log({
-                    "train/acc": acc,
-                    "train/loss": total_loss,
-                    "train/cross_entropy": ce_loss,
-                    "train/epoch": epoch,
-                    "global_step": global_step,
-                    **extra_wandb_logs,
-                })
-            # fmt: on
+                wandb.log(
+                    {
+                        "train/acc": acc,
+                        "train/loss": total_loss,
+                        "train/cross_entropy": ce_loss,
+                        "train/epoch": epoch,
+                        "global_step": global_step,
+                        **extra_wandb_logs,
+                    },
+                    step=global_step,
+                )
 
             total_loss.backward()
             optimizer.step()
+
+            if eval_every_steps is not None and global_step % eval_every_steps == 0:
+                metrics = cat.evaluation_utils.evaluate_model(
+                    model,
+                    test_dataloader,
+                    device=device,
+                    labels_str=all_classes_str,
+                    zeroshot_labels=test_classes_str,
+                    predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
+                )
+                if wandb.run is not None:
+                    wandb.log(metrics, step=global_step)
 
         # validation
         metrics = cat.evaluation_utils.evaluate_model(
@@ -353,7 +374,7 @@ def train_cat_model(
             predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
         )
         if wandb.run is not None:
-            wandb.log(metrics)
+            wandb.log(metrics, step=global_step)
 
         # Early stopping
         if early_stopping is not None:

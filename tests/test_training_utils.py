@@ -155,7 +155,8 @@ def test_train_cat_model_class_reg():
     label_encoder = cat.modelling.PreTrainedEmbeddingEncoder(emb_matrix, word2id)
 
     extra_classes_dataloader = cat.training_utils.make_extra_classes_dataloader_from_glove(
-        tests.utils.GLOVE_TMP_PATH, batch_size=4,
+        tests.utils.GLOVE_TMP_PATH,
+        batch_size=4,
     )
 
     tests.utils.delete_glove_file()

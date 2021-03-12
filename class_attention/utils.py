@@ -40,7 +40,9 @@ class GloVeTokenizer:
         text = text.lower()
 
         # NOTE: hardcoded tokenization
-        text = re.sub("worldpost", "world post", text)
+        if "worldpost" not in self.word2id:
+            text = re.sub("worldpost", "world post", text)
+
         tokens = text.split(" ")  # good enough for class names
         ids = [self.word2id[t] for t in tokens]
         return np.array(ids)
