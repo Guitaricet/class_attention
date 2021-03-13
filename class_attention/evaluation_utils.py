@@ -219,7 +219,10 @@ def make_test_classes_only_dataloader(dataset, test_classes_str, text_tokenizer,
         DataLoader with CatTestCollator
     """
     _, only_test_classes_data = cat.utils.split_classes(dataset, test_classes=test_classes_str)
-    assert set(only_test_classes_data["category"]) == set(test_classes_str)
+    assert set(only_test_classes_data["category"]) == set(test_classes_str), (
+        set(only_test_classes_data["category"]),
+        set(test_classes_str),
+    )
 
     otc_dataset = cat.CatDataset(
         only_test_classes_data["headline"],

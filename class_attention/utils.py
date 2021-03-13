@@ -141,7 +141,8 @@ def split_classes(
     Args:
         dataset: datasets.arrow_dataset.Dataset object
         p_test_classes: 0 < float < 1
-        test_classes: alternative to p_test_classes, a list of classes to move to the class-test set
+        test_classes: alternative to p_test_classes, a list of classes to move to the class-test set,
+            capitalization is ignored
         class_field_name: name of the class field in the dataset
         verbose: log splitted classes info
 
@@ -149,6 +150,8 @@ def split_classes(
         (train_set, class_test_set)
         where both objects are ArrowDataset and all test classes are moved to class_test_set
     """
+    test_classes = {t.lower() for t in test_classes}
+
     if not isinstance(dataset, datasets.arrow_dataset.Dataset):
         raise ValueError(type(dataset))
 
@@ -173,12 +176,13 @@ def split_classes(
                 f"p_test_classes={p_test_classes} is too small for the dataset with {len(all_classes)} classes."
             )
 
+        all_classes = {c.lower() for c in all_classes}
         test_classes = random.sample(all_classes, k=n_test_classes)
 
     if verbose:
         print(f"Moving the following classes to a class-test set: {test_classes}")
 
-    test_mask = [c in test_classes for c in dataset[class_field_name]]
+    test_mask = [c.lower() in test_classes for c in dataset[class_field_name]]
     train_mask = [not m for m in test_mask]
 
     test_subset = dataset[test_mask]
