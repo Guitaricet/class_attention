@@ -321,7 +321,9 @@ def train_cat_model(
                 #     the model should not prefer any class for the example from a set of wrong classes
                 extra_c = next(extra_classes_dataloader)
                 if extra_c.shape[0] == 1:
-                    logger.warning("Number of possible classes is 1, sampling from extra_classes_dataloader again")
+                    logger.warning(
+                        "Number of possible classes is 1, sampling from extra_classes_dataloader again"
+                    )
                     # TODO: awful hack, what if the ampling is bad again?
                     extra_c = next(extra_classes_dataloader)
 
@@ -345,8 +347,7 @@ def train_cat_model(
                         "train/epoch": epoch,
                         "global_step": global_step,
                         **extra_wandb_logs,
-                    },
-                    step=global_step,
+                    }
                 )
 
             total_loss.backward()
@@ -362,7 +363,7 @@ def train_cat_model(
                     predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
                 )
                 if wandb.run is not None:
-                    wandb.log(metrics, step=global_step)
+                    wandb.log(metrics)
 
         # validation
         metrics = cat.evaluation_utils.evaluate_model(
@@ -374,7 +375,7 @@ def train_cat_model(
             predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
         )
         if wandb.run is not None:
-            wandb.log(metrics, step=global_step)
+            wandb.log(metrics)
 
         # Early stopping
         if early_stopping is not None:
