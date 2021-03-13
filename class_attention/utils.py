@@ -134,7 +134,7 @@ def split_classes(
     dataset, p_test_classes=None, test_classes=None, class_field_name="category", verbose=False
 ):
     """
-    Move random classes to a class-test set (i.e. meta-test).
+    Move classes to a class-test set (i.e. meta-test).
 
     All dataset examples with these classes are removed from the original dataset
 
@@ -149,6 +149,8 @@ def split_classes(
         (train_set, class_test_set)
         where both objects are ArrowDataset and all test classes are moved to class_test_set
     """
+    if not isinstance(dataset, datasets.arrow_dataset.Dataset):
+        raise ValueError(type(dataset))
 
     if not ((p_test_classes is None) ^ (test_classes is None)):
         raise ValueError(

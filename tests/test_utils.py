@@ -3,6 +3,7 @@ import pytest
 import torch
 import torch.utils.data
 import transformers
+import datasets
 
 import class_attention as cat
 
@@ -46,6 +47,11 @@ def train_labels():
 @pytest.fixture()
 def possible_labels_str():
     return ["News", "Weather", "Sport"]
+
+
+@pytest.fixture()
+def arrow_dataset():
+    return datasets.load_dataset("Fraser/news-category-dataset")["validation"]
 
 
 @pytest.fixture()
@@ -95,11 +101,22 @@ def test_valiadte_model_per_class_on_dataloader(random_model, dataloader):
     assert at_least_one, "all metrics are either 0 or 1"
 
 
-def test_split_classes_no_zero_shot(dataloader):
-    dataset = dataloader.dataset
-
+def test_split_classes(arrow_dataset):
+    test_classes = ["RELIGION", "EDUCATION", "ARTS", "TRAVEL"]
     train_dataset, test_dataset = cat.utils.split_classes(
-        dataset,
+        arrow_dataset,
+        test_classes=test_classes,
+        class_field_name="category",
+        verbose=False,
+    )
+
+    assert set(train_dataset["category"]).isdisjoint(set(test_dataset["category"]))
+    assert set(test_dataset["category"]) == set(test_classes)
+
+
+def test_split_classes_no_zero_shot(arrow_dataset):
+    train_dataset, test_dataset = cat.utils.split_classes(
+        arrow_dataset,
         p_test_classes=0,
         test_classes=None,
         class_field_name="category",
