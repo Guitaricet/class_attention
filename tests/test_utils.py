@@ -114,6 +114,17 @@ def test_split_classes(arrow_dataset):
     assert set(test_dataset["category"]) == set(test_classes)
 
 
+def test_split_classes2(arrow_dataset):
+    test_classes = ["RELIGION", "EDUCATION", "ARTS", "TRAVEL"]
+    train_dataset, test_dataset = cat.utils.split_classes(
+        arrow_dataset,
+        test_classes=test_classes,
+    )
+
+    assert set(train_dataset["category"]).isdisjoint(set(test_dataset["category"]))
+    assert set(test_dataset["category"]) == set(test_classes)
+
+
 def test_split_classes_no_zero_shot(arrow_dataset):
     train_dataset, test_dataset = cat.utils.split_classes(
         arrow_dataset,

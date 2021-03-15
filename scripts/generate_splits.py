@@ -6,8 +6,14 @@ For the random split, they were selected randomly.
 
 This script is generated from notebooks/12_static_split.ipynb
 It expects a directory named "data" in the .. directory
+
+NOTE: the split is NOT reproducible between different machines, use
+https://drive.google.com/file/d/1Pn7HxW0yaxXPq9Vxl2Z4GmM5jf_NVulP/view?usp=sharing
+if you want to have the same version of the dataset used in the paper.
 """
+import json
 import random
+
 import datasets
 import numpy as np
 
@@ -92,6 +98,9 @@ news_dataset["train"] = reduced_train_set
 news_dataset["zero_shot_examples"] = zero_shot_examples
 
 news_dataset.save_to_disk("../data/news-category-random-split")
+with open("../data/news-category-random-split/train/state.json") as f:
+    if json.load(f)["_fingerprint"] != "6f8412ddcf9a1854":
+        print("WARNING: the fingerprint of the train set does not match")
 
 p = 0.1
 news_dataset["train"] = cat.utils.sample_dataset(news_dataset["train"], p)

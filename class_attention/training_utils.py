@@ -28,6 +28,18 @@ logger = logging.getLogger(os.path.basename(__file__))
 def prepare_dataset(
     dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0, return_zero_shot_examples=False
 ):
+    """
+
+    Args:
+        dataset_name_or_path:
+        test_class_frac:
+        dataset_frac:
+        return_zero_shot_examples: if yes, returns an extra dataset containing zero shot examples,
+            NOTE: returns none instead of a dataset if the original dataset does not contain this key
+
+    Returns:
+
+    """
     news_dataset = cat.utils.get_dataset_by_name_or_path(dataset_name_or_path)
     train_set = news_dataset["train"]
     test_set = news_dataset["validation"]
@@ -58,7 +70,7 @@ def prepare_dataset(
         )
 
     if return_zero_shot_examples and test_class_frac == 0:
-        zero_shot_examples_set = news_dataset["zero_shot_examples"]
+        zero_shot_examples_set = news_dataset.get("zero_shot_examples", None)
 
     train_classes = set(train_set["category"])
     test_classes = set(test_set["category"])

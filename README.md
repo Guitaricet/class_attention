@@ -51,3 +51,7 @@ python main.py \
   --normalize-cls \
 
 ```
+
+## Known issues
+
+* Datasets==1.2.1 is required, newer versions may not work correctly

@@ -2,58 +2,24 @@ import pytest
 import os
 
 import torch
-import transformers
 
 import class_attention as cat
 import tests.utils
 
 
-def model_factory(txt_encoder_kwargs=None, cls_encoder_kwargs=None, model_kwargs=None):
-    txt_encoder_kwargs = txt_encoder_kwargs or dict()
-    cls_encoder_kwargs = cls_encoder_kwargs or dict()
-    model_kwargs = model_kwargs or dict()
-
-    text_encoder = transformers.AutoModel.from_config(
-        transformers.BertConfig(
-            hidden_size=32,
-            num_hidden_layers=2,
-            intermediate_size=64,
-            num_attention_heads=4,
-            hidden_dropout_prob=0,
-            attention_probs_dropout_prob=0,
-            **txt_encoder_kwargs,
-        )
-    )
-    label_encoder = transformers.AutoModel.from_config(
-        transformers.BertConfig(
-            vocab_size=50,
-            hidden_size=32,
-            num_hidden_layers=2,
-            intermediate_size=64,
-            num_attention_heads=4,
-            hidden_dropout_prob=0,
-            attention_probs_dropout_prob=0,
-            **cls_encoder_kwargs,
-        )
-    )
-
-    model = cat.ClassAttentionModel(text_encoder, label_encoder, hidden_size=7, **model_kwargs)
-    return model
-
-
 @pytest.fixture()
 def model():
-    return model_factory()
+    return tests.utils.model_factory()
 
 
 @pytest.fixture()
 def bahdanau_model():
-    return model_factory(model_kwargs={"attention_type": bahdanau_model})
+    return tests.utils.model_factory(model_kwargs={"attention_type": bahdanau_model})
 
 
 @pytest.fixture()
 def cross_attention_model():
-    return model_factory(
+    return tests.utils.model_factory(
         model_kwargs={
             "cross_attention_layers": 1,
             "cross_attention_heads": 1,
@@ -158,8 +124,8 @@ def test_save_load():
     c_dict = {"input_ids": torch.LongTensor([[41], [13], [12]])}
     # fmt: on
 
-    model1 = model_factory()
-    model2 = model_factory()
+    model1 = tests.utils.model_factory()
+    model2 = tests.utils.model_factory()
 
     out1 = model1(x_dict, c_dict)
     out2 = model2(x_dict, c_dict)

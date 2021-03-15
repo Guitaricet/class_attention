@@ -2,7 +2,7 @@ numpy
 torch~=1.7.1
 transformers
 tokenizers==0.10
-datasets
+datasets==1.2.1
 sklearn
 wandb~=0.10.21
 matplotlib

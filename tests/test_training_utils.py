@@ -1,6 +1,3 @@
-import os
-
-import pytest
 import torch
 import torch.utils.data
 import numpy as np
@@ -11,18 +8,6 @@ import tests.utils
 np.random.seed(8)
 torch.manual_seed(41)
 DATASET = "Fraser/news-category-dataset"
-
-
-def default_prepare_dataloaders(**kwargs):
-    return cat.training_utils.prepare_dataloaders(
-        dataset_name_or_path=DATASET,
-        test_class_frac=0.2,
-        batch_size=8,
-        model_name="distilbert-base-uncased",
-        dataset_frac=0.001,
-        num_workers=0,
-        **kwargs,
-    )
 
 
 def test_prepare_dataset():
@@ -47,7 +32,7 @@ def test_prepare_dataloaders():
         all_classes_str,
         test_classes_str,
         data,
-    ) = default_prepare_dataloaders()
+    ) = tests.utils.default_prepare_dataloaders()
 
     assert isinstance(train_dataloader, torch.utils.data.DataLoader)
     assert isinstance(test_dataloader, torch.utils.data.DataLoader)
@@ -73,7 +58,7 @@ def test_prepare_dataloaders_glove():
         all_classes_str,
         test_classes_str,
         data,
-    ) = default_prepare_dataloaders(
+    ) = tests.utils.default_prepare_dataloaders(
         glove_path=tests.utils.GLOVE_TMP_PATH,
     )
 
@@ -117,7 +102,7 @@ def test_train_cat_model():
         all_classes_str,
         test_classes_str,
         data,
-    ) = default_prepare_dataloaders()
+    ) = tests.utils.default_prepare_dataloaders()
 
     text_encoder = cat.modelling_utils.get_small_transformer()
     label_encoder = cat.modelling_utils.get_small_transformer()
@@ -148,7 +133,7 @@ def test_train_cat_model_class_reg():
         all_classes_str,
         test_classes_str,
         data,
-    ) = default_prepare_dataloaders(glove_path=tests.utils.GLOVE_TMP_PATH)
+    ) = tests.utils.default_prepare_dataloaders(glove_path=tests.utils.GLOVE_TMP_PATH)
 
     text_encoder = cat.modelling_utils.get_small_transformer()
     emb_matrix, word2id = cat.utils.load_glove_from_file(tests.utils.GLOVE_TMP_PATH)

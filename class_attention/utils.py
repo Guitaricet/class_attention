@@ -150,8 +150,6 @@ def split_classes(
         (train_set, class_test_set)
         where both objects are ArrowDataset and all test classes are moved to class_test_set
     """
-    test_classes = {t.lower() for t in test_classes}
-
     if not isinstance(dataset, datasets.arrow_dataset.Dataset):
         raise ValueError(type(dataset))
 
@@ -176,17 +174,19 @@ def split_classes(
                 f"p_test_classes={p_test_classes} is too small for the dataset with {len(all_classes)} classes."
             )
 
-        all_classes = {c.lower() for c in all_classes}
         test_classes = random.sample(all_classes, k=n_test_classes)
 
     if verbose:
         print(f"Moving the following classes to a class-test set: {test_classes}")
 
+    test_classes = {t.lower() for t in test_classes}
     test_mask = [c.lower() in test_classes for c in dataset[class_field_name]]
     train_mask = [not m for m in test_mask]
 
     test_subset = dataset[test_mask]
     train_subset = dataset[train_mask]  # NOTE: dict of lists, not a list of dicts
+
+    assert set(test_classes) == set(c.lower() for c in test_subset[class_field_name])
 
     test_dataset = datasets.arrow_dataset.Dataset.from_dict(test_subset)
     train_dataset = datasets.arrow_dataset.Dataset.from_dict(train_subset)
