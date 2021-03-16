@@ -408,6 +408,7 @@ def train_cat_model(
                         optimizer=optimizer,
                         epoch=epoch,
                         global_step=global_step,
+                        train_classes_str=sorted(set(all_classes_str).difference(set(test_classes_str))),
                         test_classes_str=test_classes_str,
                     )
             else:
@@ -440,7 +441,7 @@ def validate_dataloader(dataloader: DataLoader, test_classes, is_test=False):
         assert set(dataset.labels).isdisjoint(set(test_classes))
 
 
-def make_label_encoder(model_name_or_path, glove=False):
+def make_label_encoder(model_name_or_path, glove=None):
     if glove is not None:
         emb_matrix, word2id = cat.utils.load_glove_from_file(glove)
         return cat.modelling.PreTrainedEmbeddingEncoder(emb_matrix, word2id)
