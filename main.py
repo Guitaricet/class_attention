@@ -193,7 +193,7 @@ def main(args):
         )
 
     if args.random_cls_vectors:
-        label_encoder = cat.modelling_utils.get_small_transformer()
+        label_encoder = cat.modelling_utils.get_small_transformer(hidden_size=args.hidden_size)
 
     model = cat.ClassAttentionModel(
         text_encoder,

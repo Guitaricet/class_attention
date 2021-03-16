@@ -123,10 +123,10 @@ def remove_smallest_princpial_component(vecs, remove_n=1):
     return A_r
 
 
-def get_small_transformer():
+def get_small_transformer(hidden_size=8):
     return transformers.AutoModel.from_config(
         transformers.BertConfig(
-            hidden_size=8,
+            hidden_size=hidden_size,
             num_hidden_layers=2,
             intermediate_size=16,
             num_attention_heads=2,
