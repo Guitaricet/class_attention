@@ -64,7 +64,7 @@ def main(args):
     model.eval()
 
     logger.info("Loading tokenizers")
-    text_tokenizer = transformers.AutoTokenizer.from_pretrained(checkpoint["model_args"], fast=True)
+    text_tokenizer = transformers.AutoTokenizer.from_pretrained(saved_args["model"], fast=True)
 
     if saved_args["glove"] is not None:
         _, word2id = cat.utils.load_glove_from_file(saved_args["glove"])
