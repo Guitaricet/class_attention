@@ -141,7 +141,8 @@ def main(args):
             probs = probs.detach().cpu().tolist()
             print(f"Predicted class: {test_classes_str[pred]} with probability {probs[pred]}")
 
-            distribution = {c: p for c, p in zip(test_classes_str, probs)}
+            distribution = {c: round(p, 4) for c, p in zip(test_classes_str, probs)}
+            distribution = sorted(distribution.items(), key=lambda x: x[1])
             print(f"Probability distribution: {pformat(distribution)}")
 
     logger.info("Script finished successfully")
