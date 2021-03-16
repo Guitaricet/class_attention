@@ -81,7 +81,7 @@ def main(args):
     logger.info("To exit press Ctrl+C or print `exit()`")
 
     while True:
-        input_str = input("Print text and the model will predict its class")
+        input_str = input("Print text and the model will predict its class:\n")
         if input_str == "exit()":
             break
 
@@ -123,6 +123,7 @@ def main(args):
 
             test_classes_str.extend(new_classes)
             test_classes_ids = encode_classes(test_classes_str, label_tokenizer)
+            continue
 
         # default handler: classify provided text
 
@@ -142,6 +143,8 @@ def main(args):
 
             distribution = {c: p for c, p in zip(test_classes_str, probs)}
             print(f"Probability distribution: {pformat(distribution)}")
+
+    logger.info("Script finished successfully")
 
 
 if __name__ == "__main__":
