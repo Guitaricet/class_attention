@@ -88,7 +88,7 @@ class ClassAttentionModel(nn.Module):
             raise ValueError("Debug mode is not supported in .from_kwargs")
 
         text_encoder = transformers.AutoModel.from_pretrained(kwargs["model"])
-        label_encoder = cat.modelling_utils.make_label_encoder(
+        label_encoder = cat.training_utils.make_label_encoder(
             model_name_or_path=kwargs["model"],
             glove=kwargs.get("glove"),
         )
