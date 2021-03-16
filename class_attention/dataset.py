@@ -65,13 +65,13 @@ class CatDataset(torch.utils.data.Dataset):
         Returns:
             torch.Tensor[text_len,]
         """
-        return self._encode_via_tokenizer(text, self.text_tokenizer)
+        return self.encode_via_tokenizer(text, self.text_tokenizer)
 
     def _convert_label_to_tensor(self, label_str):
-        return self._encode_via_tokenizer(label_str, self.label_tokenizer)
+        return self.encode_via_tokenizer(label_str, self.label_tokenizer)
 
     @staticmethod
-    def _encode_via_tokenizer(string_to_encode, tokenizer):
+    def encode_via_tokenizer(string_to_encode, tokenizer) -> torch.LongTensor:
         # TODO: use return_tensors='pt' to get the input_dict?
         # TODO: if yes, you also need to update collator
         ids_numpy = tokenizer.encode(string_to_encode)

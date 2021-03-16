@@ -408,6 +408,7 @@ def train_cat_model(
                         optimizer=optimizer,
                         epoch=epoch,
                         global_step=global_step,
+                        test_classes_str=test_classes_str,
                     )
             else:
                 patience += 1
