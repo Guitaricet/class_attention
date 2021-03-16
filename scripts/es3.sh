@@ -1,5 +1,5 @@
 # experiment set 3
-# report:
+# report: https://wandb.ai/guitaricet/class_attention/reports/ES3-Mar-16-Project-Update--Vmlldzo1MzYzOTY
 export TOKENIZERS_PARALLELISM=false
 cd ..
 
