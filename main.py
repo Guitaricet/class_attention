@@ -68,6 +68,9 @@ def parse_args(args=None):
                         help="do not use bias in added layers")
     parser.add_argument("--glove", default=None, type=str,
                         help="path to GloVe embeddings. Use them instead of transformer for class encoding.")
+    parser.add_argument("--random-cls-vectors", default=False, action="store_true",
+                        help="use random vectors as class vectors (aka untrained word2vec), "
+                             "vector size equals to --hidden-size, used as a sanity check / baseline.")
 
     # training
     parser.add_argument("--max-epochs", default=10, type=int)
@@ -127,6 +130,12 @@ def parse_args(args=None):
         args.max_epochs = 2
         args.tags = ["debug"]
 
+    if args.random_cls_vectors is not None and args.glove is not None:
+        raise ValueError("do not provide both --glove and --random-cls-vector")
+
+    if args.random_cls_vectors is not None and args.hidden_size is None:
+        raise ValueError("you should provide --hidden-size with --random-cls-vectors")
+
     if args.classes_entropy_reg is not None:
         if args.glove is None:
             raise NotImplementedError("--classes-entropy-reg is only supported in --glove mode")
@@ -182,6 +191,9 @@ def main(args):
         label_encoder = cat.training_utils.make_label_encoder(
             model_name_or_path=args.model, glove=args.glove
         )
+
+    if args.random_cls_vectors:
+        label_encoder = cat.modelling_utils.get_small_transformer()
 
     model = cat.ClassAttentionModel(
         text_encoder,
