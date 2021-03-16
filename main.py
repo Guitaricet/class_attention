@@ -93,6 +93,7 @@ def parse_args(args=None):
                         help="the number of extra classes to compute the regularization term")
     parser.add_argument("--eval-every-steps", default=None, type=int,
                         help="evaluate model each --eval-every-steps steps; does not affect early stopping")
+    parser.add_argument("--label-smoothing", default=None, type=float)
 
     # misc
     parser.add_argument("--device", default=None)
@@ -231,6 +232,7 @@ def main(args):
         early_stopping=args.early_stopping,
         save_path=args.save_to,
         eval_every_steps=args.eval_every_steps,
+        label_smoothing=args.label_smoothing,
         **extra_kwargs,
     )
 

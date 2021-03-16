@@ -7,6 +7,7 @@ import os
 import sys
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
@@ -254,6 +255,7 @@ def train_cat_model(
     extra_classes_dataloader=None,
     classes_entropy_reg=None,
     eval_every_steps=None,
+    label_smoothing=None,
 ):
     patience = 0
     monitor_name = "eval/F1_macro"
@@ -275,6 +277,11 @@ def train_cat_model(
         assert classes_entropy_reg is not None
         extra_classes_dataloader = cat.utils.infinite_iterator(extra_classes_dataloader)
 
+    if label_smoothing is not None and label_smoothing > 0:
+        loss_fn = cat.loss.LabelSmoothingLoss(label_smoothing)
+    else:
+        loss_fn = nn.CrossEntropyLoss()
+
     global_step = -1
 
     for epoch in tqdm(range(max_epochs), desc="Epochs"):
@@ -294,7 +301,7 @@ def train_cat_model(
             c_dict = {"input_ids": c}
             logits = model(x_dict, c_dict)  # [batch_size, n_classes]
 
-            total_loss = F.cross_entropy(logits, y)
+            total_loss = loss_fn(logits, y)
             ce_loss = total_loss.detach().clone()  # used for logging
 
             # if args.double_loss:
@@ -336,7 +343,7 @@ def train_cat_model(
                     logger.warning(
                         "Number of possible classes is 1, sampling from extra_classes_dataloader again"
                     )
-                    # TODO: awful hack, what if the ampling is bad again?
+                    # TODO: awful hack, what if the sampling is bad again?
                     extra_c = next(extra_classes_dataloader)
 
                 extra_c = extra_c.to(device)
