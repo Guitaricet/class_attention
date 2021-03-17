@@ -27,7 +27,11 @@ logger = logging.getLogger(os.path.basename(__file__))
 
 
 def prepare_dataset(
-    dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0, return_zero_shot_examples=False, class_field=None,
+    dataset_name_or_path,
+    test_class_frac=0.0,
+    dataset_frac=1.0,
+    return_zero_shot_examples=False,
+    class_field=None,
 ):
     """
 
@@ -78,8 +82,9 @@ def prepare_dataset(
 
     zero_shot_examples_set = None
     if test_class_frac > 0.0:
-        train_set, zero_shot_examples_set = cat.utils.split_classes(train_set, class_field=class_field,
-                                                                    p_test_classes=test_class_frac, verbose=True)
+        train_set, zero_shot_examples_set = cat.utils.split_classes(
+            train_set, class_field=class_field, p_test_classes=test_class_frac, verbose=True
+        )
 
     if return_zero_shot_examples and test_class_frac == 0:
         zero_shot_examples_set = news_dataset.get("zero_shot_examples", None)
@@ -149,7 +154,11 @@ def prepare_dataloaders(
         test_classes_str,
         zero_shot_examples,
     ) = prepare_dataset(
-        dataset_name_or_path, test_class_frac, dataset_frac, return_zero_shot_examples=True, class_field=class_field,
+        dataset_name_or_path=dataset_name_or_path,
+        test_class_frac=test_class_frac,
+        dataset_frac=dataset_frac,
+        return_zero_shot_examples=True,
+        class_field=class_field,
     )
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)

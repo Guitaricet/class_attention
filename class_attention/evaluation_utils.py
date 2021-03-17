@@ -210,7 +210,9 @@ def evaluate_model_on_subset(
     return subset_metrics
 
 
-def make_test_classes_only_dataloader(dataset, test_classes_str, text_tokenizer, label_tokenizer, text_field, class_field):
+def make_test_classes_only_dataloader(
+    dataset, test_classes_str, text_tokenizer, label_tokenizer, text_field, class_field
+):
     """Filters dataset to only contain test_classes_str and makes a dataloader with CatTestCollator
 
     Args:
@@ -223,7 +225,9 @@ def make_test_classes_only_dataloader(dataset, test_classes_str, text_tokenizer,
     if text_field is None or class_field is None:
         raise ValueError("text_field and class_field are required")
 
-    _, only_test_classes_data = cat.utils.split_classes(dataset, class_field=class_field, test_classes=test_classes_str)
+    _, only_test_classes_data = cat.utils.split_classes(
+        dataset, class_field=class_field, test_classes=test_classes_str
+    )
     assert set(only_test_classes_data[class_field]) == set(test_classes_str), (
         set(only_test_classes_data[class_field]),
         set(test_classes_str),

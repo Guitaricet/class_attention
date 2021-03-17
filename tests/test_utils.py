@@ -103,8 +103,9 @@ def test_valiadte_model_per_class_on_dataloader(random_model, dataloader):
 
 def test_split_classes(arrow_dataset):
     test_classes = ["RELIGION", "EDUCATION", "ARTS", "TRAVEL"]
-    train_dataset, test_dataset = cat.utils.split_classes(arrow_dataset, class_field="category",
-                                                          test_classes=test_classes, verbose=False)
+    train_dataset, test_dataset = cat.utils.split_classes(
+        arrow_dataset, class_field="category", test_classes=test_classes, verbose=False
+    )
 
     assert set(train_dataset["category"]).isdisjoint(set(test_dataset["category"]))
     assert set(test_dataset["category"]) == set(test_classes)
@@ -112,15 +113,17 @@ def test_split_classes(arrow_dataset):
 
 def test_split_classes2(arrow_dataset):
     test_classes = ["RELIGION", "EDUCATION", "ARTS", "TRAVEL"]
-    train_dataset, test_dataset = cat.utils.split_classes(arrow_dataset, class_field="category",
-                                                          test_classes=test_classes)
+    train_dataset, test_dataset = cat.utils.split_classes(
+        arrow_dataset, class_field="category", test_classes=test_classes
+    )
 
     assert set(train_dataset["category"]).isdisjoint(set(test_dataset["category"]))
     assert set(test_dataset["category"]) == set(test_classes)
 
 
 def test_split_classes_no_zero_shot(arrow_dataset):
-    train_dataset, test_dataset = cat.utils.split_classes(arrow_dataset, class_field="category", p_test_classes=0,
-                                                          test_classes=None, verbose=False)
+    train_dataset, test_dataset = cat.utils.split_classes(
+        arrow_dataset, class_field="category", p_test_classes=0, test_classes=None, verbose=False
+    )
 
     assert test_dataset is None

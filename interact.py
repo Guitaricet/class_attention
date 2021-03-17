@@ -70,7 +70,9 @@ def main(args):
         _, word2id = cat.utils.load_glove_from_file(saved_args["glove"])
         label_tokenizer = cat.utils.GloVeTokenizer(word2id)
     else:
-        label_tokenizer = transformers.AutoTokenizer.from_pretrained(saved_args["model"], fast=True)
+        label_tokenizer = transformers.AutoTokenizer.from_pretrained(
+            saved_args["model"], fast=True
+        )
 
     test_classes_str = checkpoint["train_classes_str"]
     test_classes_ids = encode_classes(test_classes_str, label_tokenizer)

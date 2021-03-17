@@ -272,7 +272,7 @@ def filter_words(words, extra_filter=None):
 
 
 def infer_field_names(dataset_name, text_field=None, class_field=None):
-    if ((text_field is None) ^ (class_field is None)):
+    if (text_field is None) ^ (class_field is None):
         raise ValueError("--text-field and --class-field need to be provided together")
 
     if text_field is not None:
