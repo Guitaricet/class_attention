@@ -218,7 +218,19 @@ def prepare_dataloaders(
 
     data = {"train": reduced_train_set, "test": test_set}
 
+    # TODO: figure out a better way to solve this
+    # or maybe just remove this feature
     if return_zero_shot_examples:
+        if zero_shot_examples is None:
+            return (
+                train_dataloader,
+                test_dataloader,
+                all_classes_str,
+                test_classes_str,
+                data,
+                None,
+            )
+
         zero_shot_examples_dataset = cat.CatDataset(
             zero_shot_examples[class_field],
             text_tokenizer,
