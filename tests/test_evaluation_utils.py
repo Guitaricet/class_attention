@@ -18,6 +18,8 @@ def test_make_test_classes_only_dataloader():
         test_classes_str=test_classes_str,
         text_tokenizer=text_tokenizer,
         label_tokenizer=label_tokenizer,
+        text_field="headline",
+        class_field="category",
     )
 
     assert True
@@ -41,6 +43,8 @@ def test_make_test_classes_only_dataloader_integration():
         test_classes_str=test_classes_str,
         text_tokenizer=train_dataloader.dataset.text_tokenizer,
         label_tokenizer=train_dataloader.dataset.label_tokenizer,
+        text_field="headline",
+        class_field="category",
     )
 
     assert True

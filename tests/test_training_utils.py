@@ -15,6 +15,7 @@ def test_prepare_dataset():
         dataset_name_or_path=DATASET,
         test_class_frac=0.1,
         dataset_frac=0.001,
+        class_field="category"
     )
 
     assert set(test_classes).issubset(set(all_classes))

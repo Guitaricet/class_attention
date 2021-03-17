@@ -57,9 +57,8 @@ test_classes = [
     "EDUCATION",  # related to COLLEGE, SCIENCE,
 ]
 
-reduced_train_set, zero_shot_examples = cat.utils.split_classes(
-    news_dataset["train"], test_classes=test_classes, verbose=True
-)
+reduced_train_set, zero_shot_examples = cat.utils.split_classes(news_dataset["train"], class_field="category",
+                                                                test_classes=test_classes, verbose=True)
 
 news_dataset["train"] = reduced_train_set
 news_dataset["zero_shot_examples"] = zero_shot_examples
@@ -89,11 +88,8 @@ test_classes_random = [
     "EDUCATION",
     "TRAVEL",
 ]
-reduced_train_set, zero_shot_examples = cat.utils.split_classes(
-    news_dataset["train"],
-    test_classes=test_classes_random,
-    verbose=True,
-)
+reduced_train_set, zero_shot_examples = cat.utils.split_classes(news_dataset["train"], class_field="category",
+                                                                test_classes=test_classes_random, verbose=True)
 news_dataset["train"] = reduced_train_set
 news_dataset["zero_shot_examples"] = zero_shot_examples
 

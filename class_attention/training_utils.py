@@ -27,20 +27,32 @@ logger = logging.getLogger(os.path.basename(__file__))
 
 
 def prepare_dataset(
-    dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0, return_zero_shot_examples=False
+    dataset_name_or_path, test_class_frac=0.0, dataset_frac=1.0, return_zero_shot_examples=False, class_field=None,
 ):
     """
 
     Args:
-        dataset_name_or_path:
+        dataset_name_or_path: name for the Datasets.load_dataset or path for the Datasets.load_from_disk
+            we expect the dataset to be of the form
+            "train":
+                class_field: [],
+                ...
+             "validation":
+                class_field: [],
+                ...
+
         test_class_frac:
         dataset_frac:
         return_zero_shot_examples: if yes, returns an extra dataset containing zero shot examples,
             NOTE: returns none instead of a dataset if the original dataset does not contain this key
+        class_field: name of the class key in the dataset
 
     Returns:
 
     """
+    if class_field is None:
+        raise ValueError("class_field is required")
+
     news_dataset = cat.utils.get_dataset_by_name_or_path(dataset_name_or_path)
     train_set = news_dataset["train"]
     test_set = news_dataset["validation"]
@@ -50,8 +62,8 @@ def prepare_dataset(
         train_set = cat.utils.sample_dataset(train_set, p=dataset_frac)
         test_set = cat.utils.sample_dataset(test_set, p=dataset_frac)
 
-        _train_classes = set(train_set["category"])
-        _test_classes = set(test_set["category"])
+        _train_classes = set(train_set[class_field])
+        _test_classes = set(test_set[class_field])
 
         # check that there are still multiple training classes left
         if len(_train_classes) < 2:
@@ -66,15 +78,14 @@ def prepare_dataset(
 
     zero_shot_examples_set = None
     if test_class_frac > 0.0:
-        train_set, zero_shot_examples_set = cat.utils.split_classes(
-            train_set, p_test_classes=test_class_frac, verbose=True
-        )
+        train_set, zero_shot_examples_set = cat.utils.split_classes(train_set, class_field=class_field,
+                                                                    p_test_classes=test_class_frac, verbose=True)
 
     if return_zero_shot_examples and test_class_frac == 0:
         zero_shot_examples_set = news_dataset.get("zero_shot_examples", None)
 
-    train_classes = set(train_set["category"])
-    test_classes = set(test_set["category"])
+    train_classes = set(train_set[class_field])
+    test_classes = set(test_set[class_field])
 
     # do not move this code above the IF statement as it may change all_classes
     all_classes = train_classes | test_classes
@@ -105,6 +116,8 @@ def prepare_dataloaders(
     glove_path=None,
     p_training_classes=0,
     return_zero_shot_examples=False,
+    text_field=None,
+    class_field=None,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -126,6 +139,9 @@ def prepare_dataloaders(
             all_classes_str is a full list of class string representations (e.g., ["science", "sport", "politics"]
             test_classes_str has the same format as all_classes_str, but only contains zero-shot classes
     """
+    if text_field is None or class_field is None:
+        raise ValueError("text_field and class_field are required")
+
     (
         reduced_train_set,
         test_set,
@@ -133,7 +149,7 @@ def prepare_dataloaders(
         test_classes_str,
         zero_shot_examples,
     ) = prepare_dataset(
-        dataset_name_or_path, test_class_frac, dataset_frac, return_zero_shot_examples=True
+        dataset_name_or_path, test_class_frac, dataset_frac, return_zero_shot_examples=True, class_field=class_field,
     )
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
@@ -146,16 +162,16 @@ def prepare_dataloaders(
 
     # Datasets
     reduced_train_dataset = cat.CatDataset(
-        reduced_train_set["headline"],
-        text_tokenizer,
-        reduced_train_set["category"],
-        label_tokenizer,
+        texts=reduced_train_set[text_field],
+        text_tokenizer=text_tokenizer,
+        labels=reduced_train_set[class_field],
+        label_tokenizer=label_tokenizer,
     )
     test_dataset = cat.CatDataset(
-        test_set["headline"],
-        text_tokenizer,
-        test_set["category"],
-        label_tokenizer,
+        texts=test_set[text_field],
+        text_tokenizer=text_tokenizer,
+        labels=test_set[class_field],
+        label_tokenizer=label_tokenizer,
     )
 
     # Dataloaders
@@ -195,7 +211,7 @@ def prepare_dataloaders(
 
     if return_zero_shot_examples:
         zero_shot_examples_dataset = cat.CatDataset(
-            zero_shot_examples["headline"],
+            zero_shot_examples[class_field],
             text_tokenizer,
         )
         zero_shot_examples_dataloader = DataLoader(

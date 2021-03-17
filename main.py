@@ -37,6 +37,8 @@ def parse_args(args=None):
                         help="a fraction of classes to remove from the training set (and use for zero-shot)")
     parser.add_argument("--dataset-frac", default=1.0, type=float,
                         help="a fraction of dataset to train and evaluate on, used for debugging")
+    parser.add_argument("--text-field", default=None, type=str)
+    parser.add_argument("--class-field", default=None, type=str)
 
     # architecture
     parser.add_argument("--model", default=MODEL, type=str)
@@ -147,6 +149,8 @@ def main(args):
     wandb.init(project="class_attention", config=args, tags=args.tags)
     logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
 
+    text_field, class_field = cat.utils.infer_field_names(args.dataset, text_field=args.text_field, class_field=args.class_field)
+
     logger.info("Creating dataloaders")
     # TODO: use validation dataset as an unlabeled data source
     (
@@ -166,6 +170,8 @@ def main(args):
         num_workers=args.n_workers,
         return_zero_shot_examples=True,
         glove_path=args.glove,
+        text_field=text_field,
+        class_field=class_field,
     )
 
     wandb.config.update(

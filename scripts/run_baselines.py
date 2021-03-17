@@ -13,9 +13,6 @@ import sklearn
 from sklearn.svm import LinearSVC
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-import class_attention.utils
-import wandb
-
 import class_attention as cat
 
 
@@ -81,28 +78,30 @@ def parse_args(args=None):
 def main(args):
     logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
     logger.info("Preparing the data")
-    news_dataset = class_attention.utils.get_dataset_by_name_or_path(args.dataset)
+    text_field, class_field = cat.utils.infer_field_names(dataset_name=args.dataset)
+
+    news_dataset = cat.utils.get_dataset_by_name_or_path(args.dataset)
 
     train_set = news_dataset["train"]
     valid_set = news_dataset["validation"]
 
-    train_classes = list(set(train_set["category"]))
+    train_classes = list(set(train_set[class_field]))
     class2id = {c: i for i, c in enumerate(train_classes)}
 
-    valid_set = valid_set.filter(lambda x: x["category"] in train_classes)
+    valid_set = valid_set.filter(lambda x: x[class_field] in train_classes)
 
     logger.info("Training TF-IDF vectorizer")
 
     vectorizer = TfidfVectorizer()
-    X_train = vectorizer.fit_transform(train_set["headline"])
-    y_train = train_set["category"]
+    X_train = vectorizer.fit_transform(train_set[text_field])
+    y_train = train_set[class_field]
 
     logger.info("Training Linear SVM classifier")
     model = LinearSVC()
     model.fit(X_train, y_train)
 
-    X_test = vectorizer.transform(valid_set["headline"])
-    y_test = valid_set["category"]
+    X_test = vectorizer.transform(valid_set[text_field])
+    y_test = valid_set[class_field]
 
     predictions = model.predict(X_test)
 
@@ -124,8 +123,8 @@ def main(args):
 
     def preprocess_function(examples):
         return {
-            **tokenizer(examples["headline"], truncation=True),
-            "label": [class2id[c] for c in examples["category"]],
+            **tokenizer(examples[text_field], truncation=True),
+            "label": [class2id[c] for c in examples[class_field]],
         }
 
     encoded_train_set = train_set.map(preprocess_function, batched=True)

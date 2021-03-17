@@ -130,9 +130,7 @@ def sample_dataset(dataset, p):
     return sampled_dataset
 
 
-def split_classes(
-    dataset, p_test_classes=None, test_classes=None, class_field_name="category", verbose=False
-):
+def split_classes(dataset, class_field, p_test_classes=None, test_classes=None, verbose=False):
     """
     Move classes to a class-test set (i.e. meta-test).
 
@@ -143,13 +141,16 @@ def split_classes(
         p_test_classes: 0 < float < 1
         test_classes: alternative to p_test_classes, a list of classes to move to the class-test set,
             capitalization is ignored
-        class_field_name: name of the class field in the dataset
+        class_field: name of the class field in the dataset
         verbose: log splitted classes info
 
     Returns:
         (train_set, class_test_set)
         where both objects are ArrowDataset and all test classes are moved to class_test_set
     """
+    if class_field is None:
+        raise ValueError("class_field is required")
+
     if not isinstance(dataset, datasets.arrow_dataset.Dataset):
         raise ValueError(type(dataset))
 
@@ -167,7 +168,7 @@ def split_classes(
         return dataset, None
 
     if p_test_classes is not None:
-        all_classes = list(set(dataset[class_field_name]))
+        all_classes = list(set(dataset[class_field]))
         n_test_classes = int(len(all_classes) * p_test_classes)
         if n_test_classes == 0:
             raise ValueError(
@@ -180,13 +181,13 @@ def split_classes(
         print(f"Moving the following classes to a class-test set: {test_classes}")
 
     test_classes = {t.lower() for t in test_classes}
-    test_mask = [c.lower() in test_classes for c in dataset[class_field_name]]
+    test_mask = [c.lower() in test_classes for c in dataset[class_field]]
     train_mask = [not m for m in test_mask]
 
     test_subset = dataset[test_mask]
     train_subset = dataset[train_mask]  # NOTE: dict of lists, not a list of dicts
 
-    assert set(test_classes) == set(c.lower() for c in test_subset[class_field_name])
+    assert set(test_classes) == set(c.lower() for c in test_subset[class_field])
 
     test_dataset = datasets.arrow_dataset.Dataset.from_dict(test_subset)
     train_dataset = datasets.arrow_dataset.Dataset.from_dict(train_subset)
@@ -268,3 +269,16 @@ def filter_words(words, extra_filter=None):
         res = [w for w in res if extra_filter(w)]
 
     return res
+
+
+def infer_field_names(dataset_name, text_field=None, class_field=None):
+    if ((text_field is None) ^ (class_field is None)):
+        raise ValueError("--text-field and --class-field need to be provided together")
+
+    if text_field is not None:
+        return text_field, class_field
+
+    if "news-category" in dataset_name:
+        return "headline", "category"
+
+    raise ValueError(f"Cannot infer field names from the dataset `{dataset_name}`")

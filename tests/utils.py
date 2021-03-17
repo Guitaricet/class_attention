@@ -110,8 +110,10 @@ def default_prepare_dataloaders(**kwargs):
         test_class_frac=0.2,
         batch_size=8,
         model_name="distilbert-base-uncased",
-        dataset_frac=0.001,
+        dataset_frac=0.005,
         num_workers=0,
+        text_field="headline",
+        class_field="category",
     )
 
     for key, value in kwargs.items():
