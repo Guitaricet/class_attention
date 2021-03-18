@@ -5,5 +5,6 @@ from class_attention.modelling_class_attention import ClassAttentionModel
 import class_attention.utils
 import class_attention.loss
 import class_attention.modelling_utils
+import class_attention.modelling
 import class_attention.training_utils
 import class_attention.evaluation_utils

@@ -127,3 +127,25 @@ def test_split_classes_no_zero_shot(arrow_dataset):
     )
 
     assert test_dataset is None
+
+
+def test_get_cced(random_model):
+    tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-uncased")
+    train_classes_str = ["train", "classes", "str"]
+    test_classes_str = ["test", "labels"]
+
+    cced_0 = cat.utils.get_cced(
+        model=random_model,
+        train_classes_str=train_classes_str,
+        test_classes_str=train_classes_str,
+        label_tokenizer=tokenizer,
+    )
+    assert cced_0.item() == 0
+
+    cced = cat.utils.get_cced(
+        model=random_model,
+        train_classes_str=train_classes_str,
+        test_classes_str=test_classes_str,
+        label_tokenizer=tokenizer,
+    )
+    assert cced.item() > 0

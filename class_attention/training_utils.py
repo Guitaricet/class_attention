@@ -297,6 +297,7 @@ def train_cat_model(
     patience = 0
     monitor_name = "eval/F1_macro"
     best_monitor = 0
+    train_classes_str = sorted(set(all_classes_str).difference(set(test_classes_str)))
 
     if save_path is None and early_stopping is not None:
         logger.warning(
@@ -334,9 +335,9 @@ def train_cat_model(
             c = c.to(device)
             y = y.to(device)
 
-            x_dict = {"input_ids": x}
-            c_dict = {"input_ids": c}
-            logits = model(x_dict, c_dict)  # [batch_size, n_classes]
+            logits, h_c = model(
+                text_input=x, labels_input=c, return_class_embeddings=True
+            )  # [batch_size, n_classes]
 
             total_loss = loss_fn(logits, y)
             ce_loss = total_loss.detach().clone()  # used for logging
@@ -418,6 +419,16 @@ def train_cat_model(
                     zeroshot_labels=test_classes_str,
                     predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
                 )
+                # central class embedding distance
+                cced = cat.utils.get_cced(
+                    model,
+                    train_classes_str,
+                    test_classes_str,
+                    train_dataloader.dataset.label_tokenizer,
+                    device,
+                )
+                metrics["cced"] = cced
+
                 if wandb.run is not None:
                     wandb.log(metrics)
 
@@ -430,6 +441,16 @@ def train_cat_model(
             zeroshot_labels=test_classes_str,
             predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
         )
+        # central class embedding distance
+        cced = cat.utils.get_cced(
+            model,
+            train_classes_str,
+            test_classes_str,
+            train_dataloader.dataset.label_tokenizer,
+            device,
+        )
+        metrics["cced"] = cced
+
         if wandb.run is not None:
             wandb.log(metrics)
 
@@ -445,7 +466,7 @@ def train_cat_model(
                         optimizer=optimizer,
                         epoch=epoch,
                         global_step=global_step,
-                        train_classes_str=sorted(set(all_classes_str).difference(set(test_classes_str))),
+                        train_classes_str=train_classes_str,
                         test_classes_str=test_classes_str,
                     )
             else:

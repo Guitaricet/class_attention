@@ -282,3 +282,38 @@ def infer_field_names(dataset_name, text_field=None, class_field=None):
         return "headline", "category"
 
     raise ValueError(f"Cannot infer field names from the dataset `{dataset_name}`")
+
+
+def encode_classes(classes_str, label_tokenizer):
+    return label_tokenizer.batch_encode_plus(
+        classes_str,
+        return_tensors="pt",
+        add_special_tokens=True,
+        padding=True,
+    )["input_ids"]
+
+
+def get_cced(model, train_classes_str, test_classes_str, label_tokenizer, device="cpu"):
+    is_train = model.training
+    model.eval()
+
+    train_classes_ids = encode_classes(train_classes_str, label_tokenizer).to(device)
+    test_classes_ids = encode_classes(test_classes_str, label_tokenizer).to(device)
+
+    # 5 because it is not a special token and because it is small
+    fake_text_ids = torch.LongTensor([[5]]).to(device)  # (batch=1, seq=1)
+
+    _, train_classes_h = model(
+        text_input=fake_text_ids, labels_input=train_classes_ids, return_class_embeddings=True
+    )
+    _, test_classes_h = model(
+        text_input=fake_text_ids, labels_input=test_classes_ids, return_class_embeddings=True
+    )
+
+    if is_train:
+        model.train()
+
+    train_classes_h_center = torch.mean(train_classes_h, dim=0)
+    test_classes_h_center = torch.mean(test_classes_h, dim=0)
+
+    return torch.dist(train_classes_h_center, test_classes_h_center)

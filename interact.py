@@ -39,15 +39,6 @@ def parse_args(args=None):
     return args
 
 
-def encode_classes(classes_str, label_tokenizer):
-    return label_tokenizer.batch_encode_plus(
-        classes_str,
-        return_tensors="pt",
-        add_special_tokens=True,
-        padding=True,
-    )["input_ids"]
-
-
 def main(args):
     logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
 
@@ -75,7 +66,7 @@ def main(args):
         )
 
     test_classes_str = checkpoint["train_classes_str"]
-    test_classes_ids = encode_classes(test_classes_str, label_tokenizer)
+    test_classes_ids = cat.utils.encode_classes(test_classes_str, label_tokenizer)
 
     logger.info(f"The model is ready. The default classes are: {test_classes_str}.")
     logger.info("To replace them use `set_classes: class_name1 class_name2` (no commas between class names)")
@@ -103,7 +94,7 @@ def main(args):
                 continue
 
             test_classes_str = new_classes
-            test_classes_ids = encode_classes(test_classes_str, label_tokenizer)
+            test_classes_ids = cat.utils.encode_classes(test_classes_str, label_tokenizer)
             logger.info(f"Set new class names: {new_classes}")
             del new_classes
             continue
@@ -124,7 +115,7 @@ def main(args):
                 continue
 
             test_classes_str.extend(new_classes)
-            test_classes_ids = encode_classes(test_classes_str, label_tokenizer)
+            test_classes_ids = cat.utils.encode_classes(test_classes_str, label_tokenizer)
             continue
 
         # default handler: classify provided text

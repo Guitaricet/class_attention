@@ -130,7 +130,7 @@ class ClassAttentionModel(nn.Module):
 
         torch.save(checkpoint, file_path)
 
-    def forward(self, text_input, labels_input):
+    def forward(self, text_input, labels_input, return_class_embeddings=False):
         """
         Compute logits for input (input_dict,) corresponding to the classes (classes_dict)
 
@@ -204,6 +204,9 @@ class ClassAttentionModel(nn.Module):
                 "train/exp_temperature": torch.exp(self.temperature.data),
             })
         # fmt: on
+
+        if return_class_embeddings:
+            return logits, h_c
 
         return logits
 
