@@ -326,6 +326,7 @@ def compute_metrics(y_true, y_pred, class_group=None, prefix=None, suffix=None):
         "P_macro" + suffix: p_macro,
         "R_macro" + suffix: r_macro,
         "F1_macro" + suffix: f1_macro,
+        "F1_weighted" + suffix: f1_weighted_score(label2_f1, label2n_expected),
     }
     per_class_res = {
         **{label + "/P": metric for label, metric in label2_precision.items()},
@@ -369,3 +370,14 @@ def _handle_suffix(suffix: Union[str, None]):
         suffix = "_" + suffix
 
     return suffix
+
+
+def f1_weighted_score(label2_f1, label2_count):
+    assert label2_f1.keys() == label2_count.keys()
+
+    _norm = label2_count.values()
+    label2_weight = {c: n / _norm for c, n in label2_count.items()}
+    assert sum(label2_weight.values()) == 1.
+
+    score = sum(label2_weight[c] * label2_f1[c] for c in label2_f1.keys())
+    return score
