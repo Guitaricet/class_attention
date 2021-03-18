@@ -377,7 +377,7 @@ def f1_weighted_score(label2_f1, label2_count):
 
     _norm = sum(label2_count.values())
     label2_weight = {c: n / _norm for c, n in label2_count.items()}
-    assert sum(label2_weight.values()) == 1.
+    assert round(sum(label2_weight.values()), 6) == 1.
 
     score = sum(label2_weight[c] * label2_f1[c] for c in label2_f1.keys())
     return score
