@@ -177,6 +177,8 @@ def predict(
 def evaluate_model_on_subset(
     model,
     dataset_str,
+    text_field,
+    class_field,
     test_classes_str,
     text_tokenizer,
     label_tokenizer,
@@ -192,8 +194,8 @@ def evaluate_model_on_subset(
         test_classes_str=test_classes_str,
         text_tokenizer=text_tokenizer,
         label_tokenizer=label_tokenizer,
-        text_field="headline",
-        class_field="category",
+        text_field=text_field,
+        class_field=class_field,
     )
 
     assert set(test_dataloader.dataset.labels) == set(test_classes_str)

@@ -268,6 +268,8 @@ def main(args):
         zero_shot_only_metrics = cat.evaluation_utils.evaluate_model_on_subset(
             model=model,
             dataset_str=data["test"],
+            text_field=args.text_field,
+            class_field=args.class_field,
             test_classes_str=test_classes_str,
             text_tokenizer=test_dataloader.dataset.text_tokenizer,
             label_tokenizer=test_dataloader.dataset.label_tokenizer,
@@ -291,6 +293,8 @@ def main(args):
         multi_shot_only_metrics = cat.evaluation_utils.evaluate_model_on_subset(
             model=model,
             dataset_str=data["test"],
+            text_field=args.text_field,
+            class_field=args.class_field,
             test_classes_str=multi_shot_classes,
             text_tokenizer=test_dataloader.dataset.text_tokenizer,
             label_tokenizer=test_dataloader.dataset.label_tokenizer,
