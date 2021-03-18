@@ -83,6 +83,7 @@ def parse_args(args=None):
                         help="do not train cls_out and txt_out")
     parser.add_argument("--freeze-cls-network", default=False, action="store_true")
     parser.add_argument("--freeze-txt-network", default=False, action="store_true")
+    parser.add_argument("--freeze-cls-embeddings", default=False, action="store_true")
     parser.add_argument("--share-txt-cls-network-params", default=False, action="store_true")
     parser.add_argument("--p-training-classes", default=0, type=float,
                         help="proportion of classes to feed into the model during of training at every batch")

@@ -267,6 +267,8 @@ class ClassAttentionModel(nn.Module):
             conditions.append(self._is_not_proj)
         if self.kwargs.get("freeze_cls_network"):
             conditions.append(self._is_not_cls_network)
+        if self.kwargs.get("freeze_cls_embeddings"):
+            conditions.append(self._is_not_cls_network_embeddings)
 
         if not self.kwargs.get("learn_temperature"):
             conditions.append(self._is_not_temperature)
@@ -291,6 +293,10 @@ class ClassAttentionModel(nn.Module):
     @staticmethod
     def _is_not_temperature(param_name):
         return "temperature" not in param_name
+
+    @staticmethod
+    def _is_not_cls_network_embeddings(param_name):
+        return "cls_encoder.embeddings" not in param_name
 
 
 class PreTrainedEmbeddingEncoder(nn.Module):
