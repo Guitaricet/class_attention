@@ -15,7 +15,7 @@ class CatDataset(torch.utils.data.Dataset):
         label_tokenizer: tokenizers.Tokenizer object
     """
 
-    def __init__(self, texts, text_tokenizer, labels=None, label_tokenizer=None):
+    def __init__(self, texts, text_tokenizer, labels=None, label_tokenizer=None, max_text_len=512):
         if labels is not None and len(texts) != len(labels):
             raise ValueError("classes and texts should have the same number of elements")
         if labels is not None and label_tokenizer is None:
@@ -25,6 +25,7 @@ class CatDataset(torch.utils.data.Dataset):
         self.text_tokenizer = text_tokenizer
         self.label_tokenizer = label_tokenizer
         self.labels = labels
+        self.max_text_len = max_text_len
 
         self._text_ids = [
             self._convert_text_to_tensor(t) for t in tqdm(self.texts, desc="Preprocessing Dataset")
@@ -65,16 +66,16 @@ class CatDataset(torch.utils.data.Dataset):
         Returns:
             torch.Tensor[text_len,]
         """
-        return self.encode_via_tokenizer(text, self.text_tokenizer)
+        return self.encode_via_tokenizer(text, self.text_tokenizer, max_length=self.max_text_len)
 
     def _convert_label_to_tensor(self, label_str):
         return self.encode_via_tokenizer(label_str, self.label_tokenizer)
 
     @staticmethod
-    def encode_via_tokenizer(string_to_encode, tokenizer) -> torch.LongTensor:
+    def encode_via_tokenizer(string_to_encode, tokenizer, max_length=None) -> torch.LongTensor:
         # TODO: use return_tensors='pt' to get the input_dict?
         # TODO: if yes, you also need to update collator
-        ids_numpy = tokenizer.encode(string_to_encode)
+        ids_numpy = tokenizer.encode(string_to_encode, max_length=max_length)
         if isinstance(ids_numpy, tokenizers.Encoding):
             ids_numpy = ids_numpy.ids
 
