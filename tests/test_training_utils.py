@@ -16,6 +16,7 @@ def test_prepare_dataset():
         test_class_frac=0.1,
         dataset_frac=0.001,
         class_field="category",
+        test_set_name="validation",
     )
 
     assert set(test_classes).issubset(set(all_classes))

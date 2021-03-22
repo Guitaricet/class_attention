@@ -1,7 +1,11 @@
 import torch
+import torch.utils.data
 import tokenizers
 
 from tqdm.auto import tqdm
+
+
+import class_attention as cat
 
 
 class CatDataset(torch.utils.data.Dataset):
@@ -20,6 +24,9 @@ class CatDataset(torch.utils.data.Dataset):
             raise ValueError("classes and texts should have the same number of elements")
         if labels is not None and label_tokenizer is None:
             raise ValueError("label_tokenizer should be provided with teh classes")
+
+        if isinstance(text_tokenizer, tokenizers.Tokenizer):
+            text_tokenizer.enable_truncation(max_length=max_text_len)
 
         self.texts = texts
         self.text_tokenizer = text_tokenizer
@@ -73,11 +80,13 @@ class CatDataset(torch.utils.data.Dataset):
 
     @staticmethod
     def encode_via_tokenizer(string_to_encode, tokenizer, max_length=None) -> torch.LongTensor:
-        # TODO: use return_tensors='pt' to get the input_dict?
-        # TODO: if yes, you also need to update collator
-        ids_numpy = tokenizer.encode(string_to_encode, max_length=max_length)
-        if isinstance(ids_numpy, tokenizers.Encoding):
-            ids_numpy = ids_numpy.ids
+        if isinstance(tokenizer, tokenizers.Tokenizer):
+            ids_numpy = tokenizer.encode(string_to_encode).ids
+        else:
+            # the case of transformers Tokenizer or GloVeTokenizer
+            # (the latter ignores max_length, but it is only applied to
+            # class names so it is not supposed to used max_length!=None)
+            ids_numpy = tokenizer.encode(string_to_encode, max_length=max_length)
 
         ids_torch = torch.LongTensor(ids_numpy)
         return ids_torch

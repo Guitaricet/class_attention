@@ -114,6 +114,7 @@ def default_prepare_dataloaders(**kwargs):
         num_workers=0,
         text_field="headline",
         class_field="category",
+        test_set_name="validation",
     )
 
     for key, value in kwargs.items():

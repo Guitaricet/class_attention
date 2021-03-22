@@ -100,6 +100,8 @@ def parse_args(args=None):
     parser.add_argument("--eval-every-steps", default=None, type=int,
                         help="evaluate model each --eval-every-steps steps; does not affect early stopping")
     parser.add_argument("--label-smoothing", default=None, type=float)
+    parser.add_argument("--evaluate-on", default="validation", type=str,
+                        help="a split name to evaluate the model on")
 
     # misc
     parser.add_argument("--device", default=None)
@@ -177,6 +179,7 @@ def main(args):
         glove_path=args.glove,
         text_field=text_field,
         class_field=class_field,
+        test_set_name=args.evaluate_on,
     )
 
     wandb.config.update(

@@ -35,7 +35,7 @@ class GloVeTokenizer:
         self.word2id = word2id
         self.pad_token_id = int(pad_token_id)
 
-    def encode(self, text):
+    def encode(self, text, **kwargs):
         # tokenizer.encode -> numpy tensor of shape [seq_len,]
         text = text.lower()
 

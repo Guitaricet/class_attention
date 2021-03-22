@@ -32,6 +32,7 @@ def prepare_dataset(
     dataset_frac=1.0,
     return_zero_shot_examples=False,
     class_field=None,
+    test_set_name=None,
 ):
     """
 
@@ -56,10 +57,12 @@ def prepare_dataset(
     """
     if class_field is None:
         raise ValueError("class_field is required")
+    if test_set_name is None:
+        raise ValueError("test_set_name is required")
 
     news_dataset = cat.utils.get_dataset_by_name_or_path(dataset_name_or_path)
     train_set = news_dataset["train"]
-    test_set = news_dataset["validation"]
+    test_set = news_dataset[test_set_name]
 
     if dataset_frac < 1:
         # sample from the train set and the test set
@@ -123,6 +126,7 @@ def prepare_dataloaders(
     return_zero_shot_examples=False,
     text_field=None,
     class_field=None,
+    test_set_name=None,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -147,6 +151,9 @@ def prepare_dataloaders(
     if text_field is None or class_field is None:
         raise ValueError("text_field and class_field are required")
 
+    if test_set_name is None:
+        raise ValueError("test_set_name is required")
+
     (
         reduced_train_set,
         test_set,
@@ -159,6 +166,7 @@ def prepare_dataloaders(
         dataset_frac=dataset_frac,
         return_zero_shot_examples=True,
         class_field=class_field,
+        test_set_name=test_set_name,
     )
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
