@@ -111,6 +111,8 @@ def parse_args(args=None):
     parser.add_argument("--n-workers", default=8, type=int)
     parser.add_argument("--save-to", default=None, type=str,
                         help="Checkpoint file to save the model state, optimizer state and script arguments")
+    parser.add_argument("--wandb-name", default=None, type=str,
+                        help="wandb run name")
 
     args = parser.parse_args(args)
     args.device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -147,7 +149,7 @@ def parse_args(args=None):
 
 
 def main(args):
-    wandb.init(project="class_attention", config=args, tags=args.tags)
+    wandb.init(project="class_attention", config=args, tags=args.tags, name=args.wandb_name)
     logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
 
     text_field, class_field = cat.utils.infer_field_names(
