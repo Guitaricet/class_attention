@@ -353,46 +353,14 @@ def train_cat_model(
             # Regularization
             extra_wandb_logs = dict()
             if extra_examples_dataloader is not None:
-                extra_x, all_c = next(extra_examples_dataloader)
-                extra_x = extra_x.to(device)
-                all_c = all_c.to(device)
-                examples_batch_size = extra_x.shape[0]
+                neg_entropy = get_extra_examples_neg_entropy(extra_examples_dataloader, model, device)
 
-                logits = model(extra_x, all_c)
-
-                neg_entropy = F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)
-                neg_entropy = torch.sum(neg_entropy) / examples_batch_size
-                examples_entropy_loss = examples_entropy_reg * neg_entropy
-                total_loss += examples_entropy_loss
+                total_loss += examples_entropy_reg * neg_entropy
                 extra_wandb_logs["train/extra_examples_entropy"] = -neg_entropy
 
             if extra_classes_dataloader:
-                # NOTE: can we concat extra classes to the original `c`
-                # so you don't need to forward the model one more time?
-                #
-                # Use real data, but extra classes.
-                # Question: do we really need to sample real data?
-                # Answer: yes, because:
-                #     1. Look at the math
-                #     2. Intuition of this regularization is that
-                #     the model should not prefer any class for the example from a set of wrong classes
-                extra_c = next(extra_classes_dataloader)
-                if extra_c.shape[0] == 1:
-                    logger.warning(
-                        "Number of possible classes is 1, sampling from extra_classes_dataloader again"
-                    )
-                    # TODO: awful hack, what if the sampling is bad again?
-                    extra_c = next(extra_classes_dataloader)
-
-                extra_c = extra_c.to(device)
-                n_classes = extra_c.shape[0]
-
-                logits = model(x, extra_c)
-
-                neg_entropy = F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)
-                neg_entropy = torch.sum(neg_entropy) / n_classes
-                classes_entropy_loss = classes_entropy_reg * neg_entropy
-                total_loss += classes_entropy_loss
+                neg_entropy = get_extra_classes_neg_entropy(x, extra_classes_dataloader, model, device)
+                total_loss += classes_entropy_reg * neg_entropy
                 extra_wandb_logs["train/extra_classes_entropy"] = -neg_entropy
 
             if wandb.run is not None:
@@ -505,3 +473,48 @@ def make_label_encoder(model_name_or_path, glove=None):
         return cat.modelling.PreTrainedEmbeddingEncoder(emb_matrix, word2id)
 
     return transformers.AutoModel.from_pretrained(model_name_or_path)
+
+
+def get_extra_examples_neg_entropy(extra_examples_dataloader, model, device):
+    extra_x, all_c = next(extra_examples_dataloader)
+
+    extra_x = extra_x.to(device)
+    all_c = all_c.to(device)
+    examples_batch_size = extra_x.shape[0]
+
+    logits = model(extra_x, all_c)
+
+    neg_entropy = F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)
+    neg_entropy = torch.sum(neg_entropy) / examples_batch_size
+
+    return neg_entropy
+
+
+def get_extra_classes_neg_entropy(x, extra_classes_dataloader, model, device):
+    # NOTE: can we concat extra classes to the original `c`
+    # so you don't need to forward the model one more time?
+    #
+    # Use real data, but extra classes.
+    # Question: do we really need to sample real data?
+    # Answer: yes, because:
+    #     1. Look at the math
+    #     2. Intuition of this regularization is that
+    #     the model should not prefer any class for the example from a set of wrong classes
+
+    extra_c = next(extra_classes_dataloader)
+    if extra_c.shape[0] == 1:
+        logger.warning(
+            "Number of possible classes is 1, sampling from extra_classes_dataloader again"
+        )
+        # TODO: awful hack, what if the sampling is bad again?
+        extra_c = next(extra_classes_dataloader)
+
+    extra_c = extra_c.to(device)
+    n_classes = extra_c.shape[0]
+
+    logits = model(x, extra_c)
+
+    neg_entropy = F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)
+    neg_entropy = torch.sum(neg_entropy) / n_classes
+
+    return neg_entropy
