@@ -281,6 +281,9 @@ def infer_field_names(dataset_name, text_field=None, class_field=None):
     if "news-category" in dataset_name:
         return "headline", "category"
 
+    if "emotion" in dataset_name or "topic" in dataset_name:
+        return "text", "category"
+
     raise ValueError(f"Cannot infer field names from the dataset `{dataset_name}`")
 
 
