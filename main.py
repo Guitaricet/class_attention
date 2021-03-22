@@ -151,12 +151,14 @@ def parse_args(args=None):
 
 
 def main(args):
-    wandb.init(project="class_attention", config=args, tags=args.tags, name=args.wandb_name)
-    logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
-
     text_field, class_field = cat.utils.infer_field_names(
         args.dataset, text_field=args.text_field, class_field=args.class_field
     )
+    args.text_field = text_field
+    args.class_field = class_field
+
+    wandb.init(project="class_attention", config=args, tags=args.tags, name=args.wandb_name)
+    logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
 
     logger.info("Creating dataloaders")
     # TODO: use validation dataset as an unlabeled data source
