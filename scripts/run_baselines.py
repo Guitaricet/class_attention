@@ -109,9 +109,13 @@ def main(args):
     linear_model_f1_score = sklearn.metrics.f1_score(
         y_pred=predictions, y_true=y_test, average="macro"
     )
+    linear_model_f1_score_weighted = sklearn.metrics.f1_score(
+        y_pred=predictions, y_true=y_test, average="weighted"
+    )
 
-    logger.info(f"Linear model test accuracy: {linear_model_accuracy}")
-    logger.info(f"Linear model test F1 score: {linear_model_f1_score}")
+    logger.info(f"Linear model test accuracy   : {linear_model_accuracy}")
+    logger.info(f"Linear model test F1 macro   : {linear_model_f1_score}")
+    logger.info(f"Linear model test F1 weighted: {linear_model_f1_score_weighted}")
 
     logger.info("Loading BERT model")
     logger.info(f"Model name: {args.bert_model}")
