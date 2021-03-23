@@ -9,6 +9,14 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+## Data preparation
+
+To generate News-category splits run
+```bash
+cd scripts
+python generate_splits.py
+```
+
 ## Usage
 
 ```bash
