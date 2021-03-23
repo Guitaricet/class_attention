@@ -137,7 +137,7 @@ def parse_args(args=None):
         args.max_epochs = 2
         args.tags = ["debug"]
 
-    if args.random_cls_vectors is not None and args.glove is not None:
+    if args.random_cls_vectors and args.glove is not None:
         raise ValueError("do not provide both --glove and --random-cls-vector")
 
     if args.random_cls_vectors is not None and args.hidden_size is None:
