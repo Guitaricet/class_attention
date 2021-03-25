@@ -10,25 +10,29 @@ class CatCollator:
 
     Args:
         pad_token_id: paddng token id used for BOTH texts and classes
-        p_classes: 0 <= float <= 1, if 0 no class names are added to the ones in the batch;
+        p_extra_classes: 0 <= float <= 1, if 0 no class names are added to the ones in the batch;
             if 1 then all possible_labels_ids are used in each batch
         possible_labels_ids: torch.LongTensor[n_labels, label_len], a matrix of padded label ids;
-            required if p_classes is specified
+            required if p_extra_classes is specified
+        p_no_class: 0 <= float < 1, proportion of data without true label
     """
-
-    def __init__(self, pad_token_id, possible_labels_ids=None, p_classes=0):
-        if p_classes not in [0, 1]:
+    def __init__(self, pad_token_id, possible_labels_ids=None, p_extra_classes=0, p_no_class=0):
+        if p_extra_classes not in [0, 1]:
             raise NotImplementedError()
 
-        if not 0 <= p_classes <= 1:
-            raise ValueError(p_classes)
+        if not 0 <= p_extra_classes <= 1:
+            raise ValueError(p_extra_classes)
 
-        if p_classes > 0 and possible_labels_ids is None:
-            raise ValueError("if p_classes > 0 possible_labels_ids should be specified")
+        if p_extra_classes > 0 and possible_labels_ids is None:
+            raise ValueError("if p_extra_classes > 0 possible_labels_ids should be specified")
+
+        if p_no_class > 0 and p_extra_classes < 1:
+            raise NotImplementedError("the training loop does not support --p-no-class with --p-extra-classes 1.")
 
         self.pad_token_id = pad_token_id
         self.possible_labels = possible_labels_ids
-        self.p_classes = p_classes
+        self.p_extra_classes = p_extra_classes
+        self.p_no_class = p_no_class
 
         if self.possible_labels is not None:
             self._max_label_len = max(len(label) for label in self.possible_labels)
@@ -66,7 +70,7 @@ class CatCollator:
         max_text_len = max(len(text) for text, label in examples)
         max_label_len = max(len(label) for text, label in examples)
 
-        if self.p_classes == 1:
+        if self.p_extra_classes == 1:
             max_label_len = self._max_label_len
 
         device = examples[0][0].device
@@ -90,16 +94,32 @@ class CatCollator:
             batch_x[i, : len(text)] = text
             _pre_batch_y[i, : len(label)] = label
 
-            # inverse is the mapping from unique_labels to the original _pre_batch_y indices
-            # and this is precisely our lables
-            unique_labels, targets = torch.unique(_pre_batch_y, dim=0, return_inverse=True)
+        # inverse is the mapping from unique_labels to the original _pre_batch_y indices
+        # and this is precisely our lables
+        unique_labels, targets = torch.unique(_pre_batch_y, dim=0, return_inverse=True)
 
         # Q: can/should we shuffle the targets and unique_labels here?
         # A: no, because the dataloader shuffles for us
 
-        if self.p_classes == 1:
+        if self.p_extra_classes == 1:
             unique_labels = self.possible_labels
             targets = get_index(self.possible_labels, _pre_batch_y)
+
+        if self.p_no_class > 0:
+            leave_label_mask = torch.rand(unique_labels.size(0), device=unique_labels.device) > self.p_no_class
+            remained_labels = unique_labels[leave_label_mask]
+
+            # TODO: this is potentially very slow
+            for i, t in enumerate(targets):
+                _label = unique_labels[t]
+                new_index = get_index(remained_labels, _label.unsqueeze(0))
+
+                if len(new_index) == 1:
+                    targets[i] = new_index.squeeze()
+                elif len(new_index) == 0:
+                    targets[i] = torch.tensor(-1).to(device)
+                else:
+                    raise ValueError(new_index)
 
         return batch_x, unique_labels, targets
 

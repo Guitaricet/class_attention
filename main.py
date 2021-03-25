@@ -85,8 +85,10 @@ def parse_args(args=None):
     parser.add_argument("--freeze-txt-network", default=False, action="store_true")
     parser.add_argument("--freeze-cls-embeddings", default=False, action="store_true")
     parser.add_argument("--share-txt-cls-network-params", default=False, action="store_true")
-    parser.add_argument("--p-training-classes", default=0, type=float,
-                        help="proportion of classes to feed into the model during of training at every batch")
+    parser.add_argument("--p-extra-classes", default=0, type=float,
+                        help="proportion of extra classes to feed into the model during of training at every batch")
+    parser.add_argument("--p-no-class", default=0, type=float,
+                        help="proportion of labels to randomly drop in the batch")
     parser.add_argument("--early-stopping", default=None, type=int)
     parser.add_argument("--examples-entropy-reg", default=None, type=float,
                         help="maximize the entropy of the predicted distribution on unknown **examples**")
@@ -175,7 +177,8 @@ def main(args):
         test_class_frac=args.test_class_frac,
         dataset_frac=args.dataset_frac,
         batch_size=args.batch_size,
-        p_training_classes=args.p_training_classes,
+        p_no_class=args.p_no_class,
+        p_extra_classes=args.p_extra_classes,
         num_workers=args.n_workers,
         return_zero_shot_examples=True,
         glove_path=args.glove,

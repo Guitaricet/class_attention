@@ -122,11 +122,12 @@ def prepare_dataloaders(
     dataset_frac=1.0,
     num_workers=8,
     glove_path=None,
-    p_training_classes=0,
+    p_extra_classes=0,
     return_zero_shot_examples=False,
     text_field=None,
     class_field=None,
     test_set_name=None,
+    p_no_class=0,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -202,7 +203,8 @@ def prepare_dataloaders(
     train_collator = cat.CatCollator(
         pad_token_id=label_tokenizer.pad_token_id,
         possible_labels_ids=all_classes_ids,
-        p_classes=p_training_classes,
+        p_extra_classes=p_extra_classes,
+        p_no_class=p_no_class,
     )
     test_collator = cat.CatTestCollator(
         possible_labels_ids=all_classes_ids, pad_token_id=label_tokenizer.pad_token_id
@@ -347,16 +349,39 @@ def train_cat_model(
                 text_input=x, labels_input=c, return_class_embeddings=True
             )  # [batch_size, n_classes]
 
-            total_loss = loss_fn(logits, y)
-            ce_loss = total_loss.detach().clone()  # used for logging
+            # maximize the entropy of class distribution for the examples without the true label
+            # compute cross entropy on the rest
+            has_label_mask = (y != -1)
+
+            total_loss = torch.tensor(0, dtype=torch.float32, device=device)
+
+            ce_loss = None
+            acc = None
+            if sum(has_label_mask) > 1:
+                # only use examples with the true label to compute cross-entropy loss
+                ce_logits = logits[has_label_mask]
+                y = y[has_label_mask]
+                _ce_loss = loss_fn(ce_logits, y)
+                total_loss += _ce_loss
+
+                ce_loss = _ce_loss.detach().clone()  # used for logging
+
+                _, preds = ce_logits.max(-1)
+                acc = torch.sum(preds == y).float() / x.shape[0]
+
+            no_label_entropy = None
+            if sum(~has_label_mask) > 1:
+                no_label_logits = logits[~has_label_mask]
+                _no_label_entropy = get_entropy(no_label_logits)
+                # minus sign, because we want to maximize the entropy
+                total_loss -= _no_label_entropy
+
+                no_label_entropy = _no_label_entropy.detach().clone()
 
             # if args.double_loss:
             # similar to CLIP cross_entropy_loss(..., axis=0)
             # TODO: average text vectors with the same class
             # then compute the transposed cross entropy
-
-            _, preds = logits.max(-1)
-            acc = torch.sum(preds == y).float() / x.shape[0]
 
             # Regularization
             extra_wandb_logs = dict()
@@ -377,6 +402,7 @@ def train_cat_model(
                         "train/acc": acc,
                         "train/loss": total_loss,
                         "train/cross_entropy": ce_loss,
+                        "train/no_label_entropy": no_label_entropy,
                         "train/epoch": epoch,
                         "global_step": global_step,
                         **extra_wandb_logs,
@@ -526,3 +552,9 @@ def get_extra_classes_neg_entropy(x, extra_classes_dataloader, model, device):
     neg_entropy = torch.sum(neg_entropy) / n_classes
 
     return neg_entropy
+
+
+def get_entropy(logits, normalize_by_dim=0):
+    norm = logits.size(normalize_by_dim)
+    entropy = -F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)
+    return torch.sum(entropy) / norm

@@ -126,6 +126,39 @@ def test_train_cat_model():
     )
 
 
+def test_train_cat_model_nolabel():
+    # this test becomes VERY slow if num_workers > 0
+    (
+        train_dataloader,
+        test_dataloader,
+        all_classes_str,
+        test_classes_str,
+        data,
+    ) = tests.utils.default_prepare_dataloaders(
+        p_no_class=0.5,
+        p_extra_classes=1.0,
+    )
+
+    text_encoder = cat.modelling_utils.get_small_transformer()
+    label_encoder = cat.modelling_utils.get_small_transformer()
+    model = cat.ClassAttentionModel(
+        text_encoder,
+        label_encoder,
+    )
+    optimizer = torch.optim.Adam(model.get_trainable_parameters(), lr=1e-4)
+
+    cat.training_utils.train_cat_model(
+        model=model,
+        optimizer=optimizer,
+        train_dataloader=train_dataloader,
+        test_dataloader=test_dataloader,
+        all_classes_str=all_classes_str,
+        test_classes_str=test_classes_str,
+        max_epochs=3,
+        device="cpu",
+    )
+
+
 def test_train_cat_model_class_reg():
     # this test becomes VERY slow if num_workers > 0
     tests.utils.make_glove_file()
