@@ -296,10 +296,39 @@ def encode_classes(classes_str, label_tokenizer):
     )["input_ids"]
 
 
-def get_cced(model, train_classes_str, test_classes_str, label_tokenizer, device="cpu"):
+def get_cced(model, train_classes_str, test_classes_str, label_tokenizer, device):
     is_train = model.training
     model.eval()
 
+    train_classes_h, test_classes_h = get_class_vectors(
+        model, train_classes_str, test_classes_str, label_tokenizer, device
+    )
+
+    if is_train:
+        model.train()
+
+    train_classes_h_center = torch.mean(train_classes_h, dim=0)
+    test_classes_h_center = torch.mean(test_classes_h, dim=0)
+
+    return torch.dist(train_classes_h_center, test_classes_h_center)
+
+
+def get_rmasp(model, train_classes_str, test_classes_str, label_tokenizer, device="cpu"):
+    is_train = model.training
+    model.eval()
+
+    train_classes_h, test_classes_h = get_class_vectors(
+        model, train_classes_str, test_classes_str, label_tokenizer, device
+    )
+
+    if is_train:
+        model.train()
+
+    correlation_matrix = train_classes_h @ test_classes_h.T
+    return torch.sqrt(torch.mean(torch.abs(correlation_matrix)))
+
+
+def get_class_vectors(model, train_classes_str, test_classes_str, label_tokenizer, device):
     train_classes_ids = encode_classes(train_classes_str, label_tokenizer).to(device)
     test_classes_ids = encode_classes(test_classes_str, label_tokenizer).to(device)
 
@@ -313,10 +342,4 @@ def get_cced(model, train_classes_str, test_classes_str, label_tokenizer, device
         text_input=fake_text_ids, labels_input=test_classes_ids, return_class_embeddings=True
     )
 
-    if is_train:
-        model.train()
-
-    train_classes_h_center = torch.mean(train_classes_h, dim=0)
-    test_classes_h_center = torch.mean(test_classes_h, dim=0)
-
-    return torch.dist(train_classes_h_center, test_classes_h_center)
+    return train_classes_h, test_classes_h

@@ -10,7 +10,16 @@ import tests.utils
 
 def test_make_test_classes_only_dataloader():
     dataset_str = datasets.load_dataset("Fraser/news-category-dataset")["validation"]
-    test_classes_str = ['POLITICS', 'WORLD NEWS', 'EDUCATION', 'TRAVEL', 'SPORTS', 'RELIGION', 'ARTS', 'COLLEGE']
+    test_classes_str = [
+        "POLITICS",
+        "WORLD NEWS",
+        "EDUCATION",
+        "TRAVEL",
+        "SPORTS",
+        "RELIGION",
+        "ARTS",
+        "COLLEGE",
+    ]
     text_tokenizer = label_tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-uncased")
 
     tco_dataloader = cat.evaluation_utils.make_test_classes_only_dataloader(

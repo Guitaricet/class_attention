@@ -139,6 +139,7 @@ def test_get_cced(random_model):
         train_classes_str=train_classes_str,
         test_classes_str=train_classes_str,
         label_tokenizer=tokenizer,
+        device="cpu",
     )
     assert cced_0.item() == 0
 
@@ -149,3 +150,27 @@ def test_get_cced(random_model):
         label_tokenizer=tokenizer,
     )
     assert cced.item() > 0
+
+
+def test_get_rmasp(random_model):
+    tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-uncased")
+    train_classes_str = ["train", "classes", "str"]
+    test_classes_str = ["test", "labels"]
+
+    rmasp_0 = cat.utils.get_rmasp(
+        model=random_model,
+        train_classes_str=train_classes_str,
+        test_classes_str=train_classes_str,
+        label_tokenizer=tokenizer,
+        device="cpu",
+    )
+    assert rmasp_0.item() > 0
+
+    rmasp = cat.utils.get_rmasp(
+        model=random_model,
+        train_classes_str=train_classes_str,
+        test_classes_str=test_classes_str,
+        label_tokenizer=tokenizer,
+    )
+    assert rmasp.item() > 0
+    assert rmasp.item() < rmasp_0.item()

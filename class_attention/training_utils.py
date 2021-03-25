@@ -363,7 +363,7 @@ def train_cat_model(
 
             # maximize the entropy of class distribution for the examples without the true label
             # compute cross entropy on the rest
-            has_label_mask = (y != -1)
+            has_label_mask = y != -1
 
             total_loss = torch.tensor(0, dtype=torch.float32, device=device)
 
@@ -398,13 +398,17 @@ def train_cat_model(
             # Regularization
             extra_wandb_logs = dict()
             if extra_examples_dataloader is not None:
-                neg_entropy = get_extra_examples_neg_entropy(extra_examples_dataloader, model, device)
+                neg_entropy = get_extra_examples_neg_entropy(
+                    extra_examples_dataloader, model, device
+                )
 
                 total_loss += examples_entropy_reg * neg_entropy
                 extra_wandb_logs["train/extra_examples_entropy"] = -neg_entropy
 
             if extra_classes_dataloader:
-                neg_entropy = get_extra_classes_neg_entropy(x, extra_classes_dataloader, model, device)
+                neg_entropy = get_extra_classes_neg_entropy(
+                    x, extra_classes_dataloader, model, device
+                )
                 total_loss += classes_entropy_reg * neg_entropy
                 extra_wandb_logs["train/extra_classes_entropy"] = -neg_entropy
 
@@ -433,15 +437,14 @@ def train_cat_model(
                     zeroshot_labels=test_classes_str,
                     predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
                 )
-                # central class embedding distance
-                cced = cat.utils.get_cced(
+                extra_metrics = get_extra_metrics(
                     model,
                     train_classes_str,
                     test_classes_str,
                     train_dataloader.dataset.label_tokenizer,
                     device,
                 )
-                metrics["cced"] = cced
+                metrics = {**metrics, **extra_metrics}
 
                 if wandb.run is not None:
                     wandb.log(metrics)
@@ -455,15 +458,14 @@ def train_cat_model(
             zeroshot_labels=test_classes_str,
             predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
         )
-        # central class embedding distance
-        cced = cat.utils.get_cced(
+        extra_metrics = get_extra_metrics(
             model,
             train_classes_str,
             test_classes_str,
             train_dataloader.dataset.label_tokenizer,
             device,
         )
-        metrics["cced"] = cced
+        metrics = {**metrics, **extra_metrics}
 
         if wandb.run is not None:
             wandb.log(metrics)
@@ -570,3 +572,27 @@ def get_entropy(logits, normalize_by_dim=0):
     norm = logits.size(normalize_by_dim)
     entropy = -F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)
     return torch.sum(entropy) / norm
+
+
+def get_extra_metrics(model, train_classes_str, test_classes_str, label_tokenizer, device):
+    # central class embedding distance
+    cced = cat.utils.get_cced(
+        model,
+        train_classes_str,
+        test_classes_str,
+        label_tokenizer,
+        device,
+    )
+
+    # root mean absolute scalar product
+    rmasp = cat.utils.get_rmasp(
+        model,
+        train_classes_str,
+        test_classes_str,
+        label_tokenizer,
+        device,
+    )
+
+    res = {"cced": cced, "rmasp": rmasp}
+
+    return res
