@@ -68,6 +68,7 @@ def main(args):
     test_classes_str = checkpoint["train_classes_str"]
     test_classes_ids = cat.utils.encode_classes(test_classes_str, label_tokenizer)
 
+    # fmt: off
     logger.info(f"The model is ready. The default classes are: {test_classes_str}.")
     logger.info("To replace them use `set_classes: class_name1 class_name2` (no commas between class names)")
     logger.info("To add classes use `add_classes: class_name3 class_name4`")
@@ -138,6 +139,7 @@ def main(args):
             distribution = sorted(distribution.items(), key=lambda x: x[1])
             print(f"Probability distribution: {pformat(distribution)}")
 
+    # fmt: on
     logger.info("Script finished successfully")
 
 

@@ -39,7 +39,7 @@ def evaluate_model(
     Args:
         model: ClassAttentionModel
         dataloader: pytorch DataLoader with CatTestCollator
-        labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_labels
+        labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_label_ids
         zeroshot_labels: if provided, additional metrics will be computed on this set of labels
 
     Example output:
@@ -133,7 +133,7 @@ def predict(
     Args:
         model: ClassAttentionModel
         dataloader: pytorch DataLoader with CatTestCollator
-        labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_labels
+        labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_label_ids
         return_texts: if provided, the last element of the return tuple will be a list of classified texts
         progress_bar: use tqdm during prediction
 

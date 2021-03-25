@@ -20,7 +20,9 @@ def test_make_test_classes_only_dataloader():
         "ARTS",
         "COLLEGE",
     ]
-    text_tokenizer = label_tokenizer = transformers.AutoTokenizer.from_pretrained("bert-base-uncased")
+    text_tokenizer = label_tokenizer = transformers.AutoTokenizer.from_pretrained(
+        "bert-base-uncased"
+    )
 
     tco_dataloader = cat.evaluation_utils.make_test_classes_only_dataloader(
         dataset=dataset_str,

@@ -148,6 +148,7 @@ def test_get_cced(random_model):
         train_classes_str=train_classes_str,
         test_classes_str=test_classes_str,
         label_tokenizer=tokenizer,
+        device="cpu",
     )
     assert cced.item() > 0
 

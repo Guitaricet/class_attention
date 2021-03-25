@@ -202,7 +202,7 @@ def prepare_dataloaders(
 
     train_collator = cat.CatCollator(
         pad_token_id=label_tokenizer.pad_token_id,
-        possible_labels_ids=all_classes_ids,
+        possible_label_ids=all_classes_ids,
         p_extra_classes=p_extra_classes,
         p_no_class=p_no_class,
     )
