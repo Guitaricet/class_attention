@@ -332,6 +332,18 @@ def train_cat_model(
 
     global_step = -1
 
+    metrics = cat.evaluation_utils.evaluate_model(
+        model,
+        test_dataloader,
+        device=device,
+        labels_str=all_classes_str,
+        zeroshot_labels=test_classes_str,
+    )
+    metrics["global_step"] = global_step
+
+    if wandb.run is not None:
+        wandb.log(metrics)
+
     for epoch in tqdm(range(max_epochs), desc="Epochs"):
         for x, c, y in train_dataloader:
             if c.shape[0] == 1:
