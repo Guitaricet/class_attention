@@ -13,11 +13,6 @@ def model():
 
 
 @pytest.fixture()
-def bahdanau_model():
-    return tests.utils.model_factory(model_kwargs={"attention_type": bahdanau_model})
-
-
-@pytest.fixture()
 def cross_attention_model():
     return tests.utils.model_factory(
         model_kwargs={
@@ -52,22 +47,6 @@ def test_forward(model):
     # fmt: on
 
     out = model(x_dict, c_dict)
-
-    assert out.shape == (2, 3)  # [batch_size, n_possible_classes]
-
-
-def test_forward_bahdanau(bahdanau_model):
-    # fmt: off
-    x_dict = {"input_ids": torch.LongTensor([
-        [101, 9387, 6148, 17633, 2007, 2543, 1999, 1996, 7579, 102],
-        [101, 6148, 17633, 2543, 1999, 1996, 7579, 102,     0,   0],
-    ])}
-
-    # c_dict is not classes of the x_dict, these are all possible classes
-    c_dict = {"input_ids": torch.LongTensor([[41], [13], [12]])}
-    # fmt: on
-
-    out = bahdanau_model(x_dict, c_dict)
 
     assert out.shape == (2, 3)  # [batch_size, n_possible_classes]
 

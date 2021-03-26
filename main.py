@@ -62,10 +62,6 @@ def parse_args(args=None):
     parser.add_argument("--cross-attention-heads", default=1, type=int,
                         help="number of heads to use in cross-attention")
 
-    parser.add_argument("--attention-type", default="dot-product",
-                        choices=["dot-product", "bahdanau"])
-    parser.add_argument("--bahdanau-layers", default=1, type=int,
-                        help="number of layers in the bahdanau attention network")
     parser.add_argument("--no-bias", default=False, action="store_true",
                         help="do not use bias in added layers")
     parser.add_argument("--glove", default=None, type=str,

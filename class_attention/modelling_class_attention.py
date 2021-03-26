@@ -23,7 +23,6 @@ class ClassAttentionModel(nn.Module):
                 remove_n_lowest_pc,
                 n_projection_layers,
                 attention_type,
-                bahdanau_layers,
                 temperature,
         """
         super().__init__()
@@ -73,10 +72,6 @@ class ClassAttentionModel(nn.Module):
                 ffn_hidden=4 * hidden_size,
                 n_heads=n_heads,
             )
-
-        # make bahdanau attention
-        if kwargs.get("attention_type") == "bahdanau":
-            self.bahdanau_network = self.make_bahdanau_attention(kwargs)
 
         initial_temperature = kwargs.get("temperature", 0.0)
         self.temperature = nn.Parameter(
@@ -178,11 +173,7 @@ class ClassAttentionModel(nn.Module):
         if self.kwargs.get("normalize_cls"):
             h_c = cat.modelling_utils.normalize_embeds(h_c)
 
-        # either compute a dot product or a Bahdanau-like attention score
-        if self.kwargs.get("attention_type") == "bahdanau":
-            logits = self._bahdanau_attention_fn(ht=h_x, hc=h_c)
-        else:
-            logits = h_x @ h_c.T  # [bs, n_classes]
+        logits = h_x @ h_c.T  # [bs, n_classes]
 
         assert logits.shape == (h_x.shape[0], h_c.shape[0]), logits.shape
 
@@ -246,25 +237,6 @@ class ClassAttentionModel(nn.Module):
                 "Both BERT bodies not being updated"
             )
 
-    def make_bahdanau_attention(self, kwargs):
-        # if we have a projection, our input size may be different
-        if kwargs.get("n_projection_layers"):
-            attention_size = 2 * kwargs.get("hidden_size")
-        else:
-            txt_encoder_h = get_output_dim(self.txt_encoder)
-            cls_encoder_h = get_output_dim(self.cls_encoder)
-            attention_size = txt_encoder_h + cls_encoder_h
-
-        n_attention_layers = kwargs.get("bahdanau_layers", 1)
-        bahdanau_network = cat.modelling_utils.make_mlp(
-            n_layers=n_attention_layers,
-            input_size=attention_size,
-            hidden_size=attention_size // 2,
-            output_size=1,
-            use_bias=kwargs.get("use_bias", True),
-        )
-        return bahdanau_network
-
     def get_trainable_parameters(self):
         conditions = []
         if self.kwargs.get("freeze_projections"):
@@ -282,9 +254,6 @@ class ClassAttentionModel(nn.Module):
             for name, param in self.named_parameters()
             if all(cond(name) for cond in conditions)
         )
-
-    def _bahdanau_attention_fn(self, ht, hc):
-        return cat.modelling_utils.bahdanau_fn(key=ht, query=hc, scoring_fn=self.bahdanau_network)
 
     @staticmethod
     def _is_not_proj(param_name):
