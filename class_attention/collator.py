@@ -151,8 +151,7 @@ class CatCollator:
             else:
                 raise ValueError(new_index)
 
-        unique_labels = unique_labels[~leave_label_mask]
-        return unique_labels, targets
+        return remained_labels, targets
 
     def _add_p_random_classes(
         self, unique_labels, targets, device, original_unique_labels, _pre_batch_y
