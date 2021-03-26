@@ -346,8 +346,8 @@ def train_cat_model(
 
     for epoch in tqdm(range(max_epochs), desc="Epochs"):
         for x, c, y in train_dataloader:
-            if c.shape[0] == 1:
-                logger.warning("Number of possible classes is 1, skipping this batch")
+            if c.shape[0] < 2:
+                logger.warning(f"Number of possible classes is {c.shape[0]}, skipping this batch")
                 continue
 
             global_step += 1
@@ -612,4 +612,7 @@ def verify_shapes(x, y, c):
     n_classes, class_seq_len = c.shape
     batch_size_2, = y.shape
 
+    assert n_classes > 0
+
     assert batch_size_1 == batch_size_2
+    assert batch_size_1 > 0
