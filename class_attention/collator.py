@@ -109,6 +109,19 @@ class CatCollator:
                 unique_labels, targets, device, original_unique_labels, _pre_batch_y
             )
 
+        # hack to guarantee that we have enough classes to at least non-trivially forward the model
+        if unique_labels.shape[0] < 2:
+            if unique_labels.shape[1] != self._max_label_len:
+                tmp = torch.zeros(unique_labels.shape[0], self._max_label_len, dtype=torch.int64)
+                tmp[:, :unique_labels.shape[1]] = unique_labels
+                unique_labels = tmp
+
+            additional_labels = get_difference(self.possible_label_ids, unique_labels)
+
+            ids = torch.randperm(additional_labels.shape[0], device=additional_labels.device)
+            two_random_additional_labels = additional_labels[ids]
+            unique_labels = torch.cat([unique_labels, two_random_additional_labels])
+
         return batch_x, unique_labels, targets
 
     def _call_without_labels(self, examples):
