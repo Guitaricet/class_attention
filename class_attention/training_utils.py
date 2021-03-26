@@ -437,7 +437,7 @@ def train_cat_model(
             total_loss.backward()
             optimizer.step()
 
-            if eval_every_steps is not None and global_step % eval_every_steps == 0:
+            if (eval_every_steps is not None and global_step % eval_every_steps == 0) or (global_step < 5):
                 metrics = cat.evaluation_utils.evaluate_model(
                     model,
                     test_dataloader,
