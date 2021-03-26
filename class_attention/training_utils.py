@@ -356,6 +356,9 @@ def train_cat_model(
             x = x.to(device)
             c = c.to(device)
             y = y.to(device)
+            verify_shapes(x, y, c)
+
+            # --- Loss computation STARTS here ---
 
             logits, h_c = model(
                 text_input=x, labels_input=c, return_class_embeddings=True
@@ -363,7 +366,7 @@ def train_cat_model(
 
             # maximize the entropy of class distribution for the examples without the true label
             # compute cross entropy on the rest
-            has_label_mask = y != -1
+            has_label_mask = y != -1  # [batch_size,]
 
             total_loss = torch.tensor(0, dtype=torch.float32, device=device)
 
@@ -373,6 +376,10 @@ def train_cat_model(
                 # only use examples with the true label to compute cross-entropy loss
                 ce_logits = logits[has_label_mask]
                 y = y[has_label_mask]
+
+                if not (torch.all(0 <= y) and torch.all(y < ce_logits.size(1))):
+                    import ipdb; ipdb.set_trace()
+
                 _ce_loss = loss_fn(ce_logits, y)
                 total_loss += _ce_loss
 
@@ -411,6 +418,8 @@ def train_cat_model(
                 )
                 total_loss += classes_entropy_reg * neg_entropy
                 extra_wandb_logs["train/extra_classes_entropy"] = -neg_entropy
+
+            # --- Loss computation ENDS here ---
 
             if wandb.run is not None:
                 wandb.log(
@@ -596,3 +605,11 @@ def get_extra_metrics(model, train_classes_str, test_classes_str, label_tokenize
     res = {"cced": cced, "rmasp": rmasp}
 
     return res
+
+
+def verify_shapes(x, y, c):
+    batch_size_1, text_seq_len = x.shape
+    n_classes, class_seq_len = c.shape
+    batch_size_2, = y.shape
+
+    assert batch_size_1 == batch_size_2

@@ -132,3 +132,35 @@ def test_get_index_with_default():
 
     idx = cat.collator.get_index_with_default_index(x, y, torch.tensor(-1))
     assert torch.all(idx == expected_index)
+
+
+def test_remove_labels_by_mask():
+    # fmt: off
+    targets = torch.LongTensor([
+        0, 1, 0, 4, 2
+    ])
+    unique_labels = torch.LongTensor([
+        [0, 1],
+        [1, 0],
+        [2, 0],
+        [2, 1],
+        [2, 2],
+    ])
+    leave_labels_mask = torch.ByteTensor([
+        True, False, True, True, False,
+    ])
+
+    expected_targets = torch.LongTensor([0, -1, 0, -1, 1])
+    expected_unique_labels = torch.LongTensor([
+        [0, 1],
+        [2, 0],
+        [2, 1],
+    ])
+    # fmt: on
+
+    new_unique_labels, new_targets = cat.CatCollator._remove_classes_by_mask(
+        leave_labels_mask, unique_labels, targets, "cpu"
+    )
+
+    assert torch.allclose(new_targets, expected_targets)
+    assert torch.allclose(new_unique_labels, expected_unique_labels)

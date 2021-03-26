@@ -69,7 +69,7 @@ class CatCollator:
         max_text_len = max(len(text) for text, label in examples)
         max_label_len = max(len(label) for text, label in examples)
 
-        if self.p_extra_classes == 1:
+        if self.p_extra_classes > 0:
             max_label_len = self._max_label_len
 
         device = examples[0][0].device
@@ -133,11 +133,24 @@ class CatCollator:
             torch.rand(unique_labels.size(0), device=unique_labels.device) > self.p_no_class
         )
 
+        return self._remove_classes_by_mask(leave_label_mask, unique_labels, targets, device)
+
+    @staticmethod
+    def _remove_classes_by_mask(leave_class_mask, unique_labels, targets, device):
+        """Note that in leave_class_mask 1 means to leave a class and 0 means to remove it"""
+        if len(leave_class_mask.shape) != 1:
+            raise ValueError(leave_class_mask)
+        if len(unique_labels.shape) != 2:
+            raise ValueError(unique_labels)
+        if len(targets.shape) != 1:
+            raise ValueError(targets)
+        original_targets_shape = targets.shape
+
         # a little optimization
-        if leave_label_mask.sum() == leave_label_mask.size(0):
+        if leave_class_mask.sum() == leave_class_mask.size(0):
             return unique_labels, targets
 
-        remained_labels = unique_labels[leave_label_mask]
+        remained_labels = unique_labels[leave_class_mask]
         # TODO: this is potentially very slow
         # you can speed it up by using the fact that .unique sorts rows
         for i, t in enumerate(targets):
@@ -151,6 +164,7 @@ class CatCollator:
             else:
                 raise ValueError(new_index)
 
+        assert targets.shape == original_targets_shape
         return remained_labels, targets
 
     def _add_p_random_classes(
@@ -296,6 +310,7 @@ def _validate_input(examples):
 
 # source: https://discuss.pytorch.org/t/how-to-get-the-row-index-of-specific-values-in-tensor/28036/7
 def get_index(host, target):
+    assert host.shape[1] == target.shape[1]
     diff = target.unsqueeze(1) - host.unsqueeze(0)
     dsum = torch.abs(diff).sum(-1)
     loc = torch.nonzero(dsum == 0)
@@ -305,6 +320,7 @@ def get_index(host, target):
 def get_index_with_default_index(host, target, default_index):
     """Slower than get_index, because it uses for-loop,
     but it works correctly in case a host element is not an element of host"""
+    assert host.shape[1] == target.shape[1]
     device = target.device
     default_index = default_index.to(device)
 

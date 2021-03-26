@@ -136,7 +136,7 @@ def test_train_cat_model_nolabel():
         data,
     ) = tests.utils.default_prepare_dataloaders(
         p_no_class=0.5,
-        p_extra_classes=1.0,
+        p_extra_classes=0.5,
     )
 
     text_encoder = cat.modelling_utils.get_small_transformer()
