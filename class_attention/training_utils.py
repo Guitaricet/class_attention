@@ -369,7 +369,7 @@ def train_cat_model(
 
             ce_loss = None
             acc = None
-            if sum(has_label_mask) > 1:
+            if torch.sum(has_label_mask) > torch.tensor(1, device=has_label_mask.device):
                 # only use examples with the true label to compute cross-entropy loss
                 ce_logits = logits[has_label_mask]
                 y = y[has_label_mask]
@@ -382,7 +382,7 @@ def train_cat_model(
                 acc = torch.sum(preds == y).float() / x.shape[0]
 
             no_label_entropy = None
-            if sum(~has_label_mask) > 1:
+            if not torch.all(has_label_mask):
                 no_label_logits = logits[~has_label_mask]
                 _no_label_entropy = get_entropy(no_label_logits)
                 # minus sign, because we want to maximize the entropy
