@@ -113,7 +113,7 @@ class CatCollator:
         if unique_labels.shape[0] < 2:
             if unique_labels.shape[1] != self._max_label_len:
                 tmp = torch.zeros(unique_labels.shape[0], self._max_label_len, dtype=torch.int64)
-                tmp[:, :unique_labels.shape[1]] = unique_labels
+                tmp[:, : unique_labels.shape[1]] = unique_labels
                 unique_labels = tmp
 
             additional_labels = get_difference(self.possible_label_ids, unique_labels)

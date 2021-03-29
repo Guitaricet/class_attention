@@ -248,7 +248,7 @@ def main(args):
 
     cat.training_utils.train_cat_model(
         model=model,
-        optimizer=optimizer,
+        model_optimizer=optimizer,
         train_dataloader=train_dataloader,
         test_dataloader=test_dataloader,
         all_classes_str=all_classes_str,

@@ -287,7 +287,7 @@ def make_extra_classes_dataloader_from_glove(
 
 def train_cat_model(
     model: cat.ClassAttentionModel,
-    optimizer,
+    model_optimizer,
     train_dataloader,
     test_dataloader,
     all_classes_str,
@@ -351,107 +351,57 @@ def train_cat_model(
                 continue
 
             global_step += 1
-            optimizer.zero_grad()
+            model_optimizer.zero_grad()
 
             x = x.to(device)
             c = c.to(device)
             y = y.to(device)
             verify_shapes(x, y, c)
 
-            # --- Loss computation STARTS here ---
+            model_loss, training_step_metrics = get_model_loss(
+                model=model,
+                x=x,
+                c=c,
+                y=y,
+                loss_fn=loss_fn,
+                device=device,
+                global_step=global_step,
+                epoch=epoch,
+                extra_examples_dataloader=extra_examples_dataloader,
+                examples_entropy_reg=examples_entropy_reg,
+                extra_classes_dataloader=extra_classes_dataloader,
+                classes_entropy_reg=classes_entropy_reg,
+            )
 
-            logits, h_c = model(
-                text_input=x, labels_input=c, return_class_embeddings=True
-            )  # [batch_size, n_classes]
-
-            # maximize the entropy of class distribution for the examples without the true label
-            # compute cross entropy on the rest
-            has_label_mask = y != -1  # [batch_size,]
-
-            total_loss = torch.tensor(0, dtype=torch.float32, device=device)
-
-            ce_loss = None
-            acc = None
-            if torch.sum(has_label_mask) > torch.tensor(1, device=has_label_mask.device):
-                # only use examples with the true label to compute cross-entropy loss
-                ce_logits = logits[has_label_mask]
-                y = y[has_label_mask]
-
-                if not (torch.all(0 <= y) and torch.all(y < ce_logits.size(1))):
-                    import ipdb; ipdb.set_trace()
-
-                _ce_loss = loss_fn(ce_logits, y)
-                total_loss += _ce_loss
-
-                ce_loss = _ce_loss.detach().clone()  # used for logging
-
-                _, preds = ce_logits.max(-1)
-                acc = torch.sum(preds == y).float() / x.shape[0]
-
-            no_label_entropy = None
-            if not torch.all(has_label_mask):
-                no_label_logits = logits[~has_label_mask]
-                _no_label_entropy = get_entropy(no_label_logits)
-                # minus sign, because we want to maximize the entropy
-                total_loss -= _no_label_entropy
-
-                no_label_entropy = _no_label_entropy.detach().clone()
-
-            # if args.double_loss:
-            # similar to CLIP cross_entropy_loss(..., axis=0)
-            # TODO: average text vectors with the same class
-            # then compute the transposed cross entropy
-
-            # Regularization
-            extra_wandb_logs = dict()
-            if extra_examples_dataloader is not None:
-                neg_entropy = get_extra_examples_neg_entropy(
-                    extra_examples_dataloader, model, device
-                )
-
-                total_loss += examples_entropy_reg * neg_entropy
-                extra_wandb_logs["train/extra_examples_entropy"] = -neg_entropy
-
-            if extra_classes_dataloader:
-                neg_entropy = get_extra_classes_neg_entropy(
-                    x, extra_classes_dataloader, model, device
-                )
-                total_loss += classes_entropy_reg * neg_entropy
-                extra_wandb_logs["train/extra_classes_entropy"] = -neg_entropy
-
-            # --- Loss computation ENDS here ---
+            # if global_step % discriminator_update_freq == 0:
+            #     discriminator_loss = get_discriminator_loss(
+            #         extra_examples_dataloader, extra_classes_dataloader, model, device,
+            #     )
+            #     discriminator_loss.backward()
+            #     discriminator_opt.step()
+            # def _get_model_loss_and_metrics(...):
 
             if wandb.run is not None:
-                wandb.log(
-                    {
-                        "train/acc": acc,
-                        "train/loss": total_loss,
-                        "train/cross_entropy": ce_loss,
-                        "train/no_label_entropy": no_label_entropy,
-                        "train/epoch": epoch,
-                        "global_step": global_step,
-                        **extra_wandb_logs,
-                    }
-                )
+                wandb.log(training_step_metrics)
 
-            total_loss.backward()
-            optimizer.step()
+            model_loss.backward()
+            model_optimizer.step()
 
-            if (eval_every_steps is not None and global_step % eval_every_steps == 0) or (global_step < 5):
+            is_eval_step = eval_every_steps is not None and global_step % eval_every_steps == 0
+            if is_eval_step or global_step < 5:
                 metrics = cat.evaluation_utils.evaluate_model(
-                    model,
-                    test_dataloader,
+                    model=model,
+                    dataloader=test_dataloader,
                     device=device,
                     labels_str=all_classes_str,
                     zeroshot_labels=test_classes_str,
-                    predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
                 )
                 extra_metrics = get_extra_metrics(
-                    model,
-                    train_classes_str,
-                    test_classes_str,
-                    train_dataloader.dataset.label_tokenizer,
-                    device,
+                    model=model,
+                    train_classes_str=train_classes_str,
+                    test_classes_str=test_classes_str,
+                    label_tokenizer=train_dataloader.dataset.label_tokenizer,
+                    device=device,
                 )
                 metrics = {**metrics, **extra_metrics}
 
@@ -460,19 +410,19 @@ def train_cat_model(
 
         # validation
         metrics = cat.evaluation_utils.evaluate_model(
-            model,
-            test_dataloader,
+            model=model,
+            dataloader=test_dataloader,
             device=device,
             labels_str=all_classes_str,
             zeroshot_labels=test_classes_str,
             predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
         )
         extra_metrics = get_extra_metrics(
-            model,
-            train_classes_str,
-            test_classes_str,
-            train_dataloader.dataset.label_tokenizer,
-            device,
+            model=model,
+            train_classes_str=train_classes_str,
+            test_classes_str=test_classes_str,
+            label_tokenizer=train_dataloader.dataset.label_tokenizer,
+            device=device,
         )
         metrics = {**metrics, **extra_metrics}
 
@@ -488,7 +438,7 @@ def train_cat_model(
                 if save_path is not None:
                     model.save(
                         file_path=save_path,
-                        optimizer=optimizer,
+                        optimizer=model_optimizer,
                         epoch=epoch,
                         global_step=global_step,
                         train_classes_str=train_classes_str,
@@ -501,6 +451,8 @@ def train_cat_model(
                         f"The target metric did not improve over {patience} iterations. Stopping early."
                     )
                     break
+
+    # Training loop ends
 
     if early_stopping is not None and save_path is not None:
         logger.info(f"Loading the best model, expecting {monitor_name} to be {best_monitor}")
@@ -610,9 +562,115 @@ def get_extra_metrics(model, train_classes_str, test_classes_str, label_tokenize
 def verify_shapes(x, y, c):
     batch_size_1, text_seq_len = x.shape
     n_classes, class_seq_len = c.shape
-    batch_size_2, = y.shape
+    (batch_size_2,) = y.shape
 
     assert n_classes > 0
 
     assert batch_size_1 == batch_size_2
     assert batch_size_1 > 0
+
+
+def get_model_loss(
+    model: cat.ClassAttentionModel,
+    x: torch.LongTensor,
+    c: torch.LongTensor,
+    y: torch.LongTensor,
+    loss_fn,
+    device,
+    global_step,
+    epoch,
+    extra_examples_dataloader=None,
+    examples_entropy_reg=None,
+    extra_classes_dataloader=None,
+    classes_entropy_reg=None,
+):
+    """
+    Computes a single forward step for the model (not the discriminator).
+
+    Args:
+        model: cat.ClassAttentionModel
+        x: LongTensor[batch_size, text_seq_len], text representation
+        c: LongTensor[n_classes, class_seq_len], class representation
+        y: LongTensor[batch_size,], targets
+        loss_fn: function that accepts logits and targets and returns a scalar, e.g. cat.loss.LabelSmoothingLoss
+        device: torch.device
+        global_step: int
+        epoch: int
+        extra_examples_dataloader: a dataloader with extra examples without labels (used to maximize entropy on them)
+        examples_entropy_reg: extra examples entropy regularization coefficient
+        extra_classes_dataloader: a dataloader with extra labels without example (used to maximize entropy on them)
+        classes_entropy_reg: extra classes entropy regularization coefficient
+
+    Returns:
+        loss, metrics
+
+        where
+            loss: torch scalar
+            metrics: dict(str -> scalar)
+    """
+    logits, h_c = model(
+        text_input=x, labels_input=c, return_class_embeddings=True
+    )  # [batch_size, n_classes]
+
+    # maximize the entropy of class distribution for the examples without the true label
+    # compute cross entropy on the rest
+    has_label_mask = y != -1  # [batch_size,]
+
+    total_loss = torch.tensor(0, dtype=torch.float32, device=device)
+
+    ce_loss = None
+    acc = None
+    if torch.sum(has_label_mask) > torch.tensor(1, device=has_label_mask.device):
+        # only use examples with the true label to compute cross-entropy loss
+        ce_logits = logits[has_label_mask]
+        y = y[has_label_mask]
+
+        if not (torch.all(0 <= y) and torch.all(y < ce_logits.size(1))):
+            raise ValueError(y)
+
+        _ce_loss = loss_fn(ce_logits, y)
+        total_loss += _ce_loss
+
+        ce_loss = _ce_loss.detach().clone()  # used for logging
+
+        _, preds = ce_logits.max(-1)
+        acc = torch.sum(preds == y).float() / x.shape[0]
+
+    no_label_entropy = None
+    if not torch.all(has_label_mask):
+        no_label_logits = logits[~has_label_mask]
+        _no_label_entropy = get_entropy(no_label_logits)
+        # minus sign, because we want to maximize the entropy
+        total_loss -= _no_label_entropy
+
+        no_label_entropy = _no_label_entropy.detach().clone()
+
+    # if args.double_loss:
+    # similar to CLIP cross_entropy_loss(..., axis=0)
+    # TODO: average text vectors with the same class
+    # then compute the transposed cross entropy
+
+    # Regularization
+    extra_metrics = dict()
+    if extra_examples_dataloader is not None:
+        neg_entropy = get_extra_examples_neg_entropy(extra_examples_dataloader, model, device)
+
+        total_loss += examples_entropy_reg * neg_entropy
+        extra_metrics["train/extra_examples_entropy"] = -neg_entropy
+
+    if extra_classes_dataloader:
+        neg_entropy = get_extra_classes_neg_entropy(x, extra_classes_dataloader, model, device)
+        total_loss += classes_entropy_reg * neg_entropy
+        extra_metrics["train/extra_classes_entropy"] = -neg_entropy
+
+    metrics = {
+        "train/acc": acc,
+        "train/loss": total_loss,
+        "train/cross_entropy": ce_loss,
+        "train/no_label_entropy": no_label_entropy,
+        "train/epoch": epoch,
+        "global_step": global_step,
+        **extra_metrics,
+    }
+
+    return total_loss, metrics
