@@ -32,6 +32,8 @@ class ClassAttentionModel(nn.Module):
         txt_encoder_h = get_output_dim(self.txt_encoder)
         cls_encoder_h = get_output_dim(self.cls_encoder)
 
+        self._final_hidden_size = txt_encoder_h
+
         self.validate_kwargs(kwargs)
         self.kwargs = kwargs or dict()
 
@@ -47,6 +49,7 @@ class ClassAttentionModel(nn.Module):
         n_projection_layers = self.kwargs.get("n_projection_layers", None)
         if n_projection_layers is not None and n_projection_layers > 0:
             hidden_size = self.kwargs["hidden_size"]  # guaranteed in validate_kwargs
+            self._final_hidden_size = hidden_size
             self.txt_out = cat.modelling_utils.make_mlp(
                 n_layers=n_projection_layers,
                 input_size=txt_encoder_h,
@@ -65,6 +68,8 @@ class ClassAttentionModel(nn.Module):
         cross_attention_layers = self.kwargs.get("cross_attention_layers", None)
         if cross_attention_layers is not None and cross_attention_layers > 0:
             hidden_size = self.kwargs["hidden_size"]  # guaranteed in validate_kwargs
+            self._final_hidden_size = hidden_size
+
             n_heads = self.kwargs["cross_attention_heads"]  # guaranteed in validate_kwargs
             self.class_transformer = ClassTransformerBlock(
                 n_layers=cross_attention_layers,
@@ -77,6 +82,10 @@ class ClassAttentionModel(nn.Module):
         self.temperature = nn.Parameter(
             torch.tensor(initial_temperature, requires_grad=kwargs.get("learn_temperature", False))
         )
+
+    @property
+    def final_hidden_size(self):
+        return self._final_hidden_size
 
     @classmethod
     def from_kwargs(cls, **kwargs):
@@ -125,7 +134,7 @@ class ClassAttentionModel(nn.Module):
 
         torch.save(checkpoint, file_path)
 
-    def forward(self, text_input, labels_input, return_class_embeddings=False):
+    def forward(self, text_input, labels_input, return_embeddings=False):
         """
         Compute logits for input (input_dict,) corresponding to the classes (classes_dict)
 
@@ -196,8 +205,8 @@ class ClassAttentionModel(nn.Module):
             })
         # fmt: on
 
-        if return_class_embeddings:
-            return logits, h_c
+        if return_embeddings:
+            return logits, h_x, h_c
 
         return logits
 

@@ -303,7 +303,15 @@ def train_cat_model(
     classes_entropy_reg=None,
     eval_every_steps=None,
     label_smoothing=None,
+    discriminator=None,
+    discriminator_optimizer=None,
+    discriminator_update_freq=None,
 ):
+    _check_discriminator_triplet(discriminator, discriminator_optimizer, discriminator_update_freq)
+
+    if discriminator_update_freq is None:
+        discriminator_update_freq = 1  # only to safely use in with the %-operation
+
     patience = 0
     monitor_name = "eval/F1_macro"
     best_monitor = 0
@@ -358,7 +366,7 @@ def train_cat_model(
             y = y.to(device)
             verify_shapes(x, y, c)
 
-            model_loss, training_step_metrics = get_model_loss(
+            model_loss, h_x, h_c, training_step_metrics = get_model_loss(
                 model=model,
                 x=x,
                 c=c,
@@ -373,19 +381,39 @@ def train_cat_model(
                 classes_entropy_reg=classes_entropy_reg,
             )
 
-            # if global_step % discriminator_update_freq == 0:
-            #     discriminator_loss = get_discriminator_loss(
-            #         extra_examples_dataloader, extra_classes_dataloader, model, device,
-            #     )
-            #     discriminator_loss.backward()
-            #     discriminator_opt.step()
-            # def _get_model_loss_and_metrics(...):
+            is_discriminator_update_step = global_step % discriminator_update_freq == 0
+
+            if discriminator is not None and not is_discriminator_update_step:
+                # use adversarial loss to update the network
+                anti_discriminator_loss, _ = get_discriminator_loss_from_h(
+                    discriminator,
+                    h_x,
+                    h_c,
+                    invert_targets=True,
+                )
+                model_loss += anti_discriminator_loss
+                training_step_metrics["train/loss"] = model_loss  # overrides the existing value
+                training_step_metrics["train/adversarial_reg"] = anti_discriminator_loss
 
             if wandb.run is not None:
                 wandb.log(training_step_metrics)
 
             model_loss.backward()
             model_optimizer.step()
+
+            if discriminator is not None and is_discriminator_update_step:
+                discriminator_optimizer.zero_grad()
+
+                discriminator_loss, discriminator_metrics = get_discriminator_loss_from_h(
+                    discriminator,
+                    h_x.detach(),
+                    h_c.detach(),
+                )
+                if wandb.run is not None:
+                    wandb.log(discriminator_metrics)
+
+                discriminator_loss.backward()
+                discriminator_optimizer.step()
 
             is_eval_step = eval_every_steps is not None and global_step % eval_every_steps == 0
             if is_eval_step or global_step < 5:
@@ -608,8 +636,8 @@ def get_model_loss(
             loss: torch scalar
             metrics: dict(str -> scalar)
     """
-    logits, h_c = model(
-        text_input=x, labels_input=c, return_class_embeddings=True
+    logits, h_x, h_c = model(
+        text_input=x, labels_input=c, return_embeddings=True
     )  # [batch_size, n_classes]
 
     # maximize the entropy of class distribution for the examples without the true label
@@ -673,4 +701,70 @@ def get_model_loss(
         **extra_metrics,
     }
 
-    return total_loss, metrics
+    return total_loss, h_x, h_c, metrics
+
+
+def _check_discriminator_triplet(
+    discriminator, discriminator_optimizer, discriminator_update_freq
+):
+    if (
+        discriminator is not None
+        or discriminator_optimizer is not None
+        or discriminator_update_freq is not None
+    ):
+        if discriminator is None:
+            raise ValueError("Provide discriminator")
+        if discriminator_optimizer is None:
+            raise ValueError("Provide discriminator optimizer")
+        if discriminator_update_freq is None:
+            raise ValueError("Provide discriminator_update_freq")
+
+        if discriminator_update_freq < 2:
+            raise ValueError("Discriminator update freq should be above 1, "
+                             "because the model gets adversarial loss on the steps "
+                             "when we do not update the discriminator. "
+                             "If update freq = 1 then the model does not get "
+                             "adversarial loss at all (only the discriminator does)")
+
+
+def get_discriminator_loss_from_h(discriminator, h_x, h_c, invert_targets=False):
+    """Computes the loss to train the discriminator (invert_targets=False) or
+    to train the adversary (invert_targets=True).
+
+    Args:
+        discriminator: a model that accepts [h_x:h_c] as input
+        h_x: torch.FloatTensor[batch_size, hidden]
+        h_c: torch.FloatTensor[n_classes, hidden]
+
+    Returns:
+        loss, metrics
+
+        `metrics` is None if invert_targets=True, because they do not make sense in this case
+    """
+    n_texts = h_x.shape[0]
+    n_classes = h_c.shape[0]
+    device = h_x.device
+
+    targets = torch.cat(
+        [
+            torch.ones(n_texts, dtype=torch.float32, device=device),
+            torch.zeros(n_classes, dtype=torch.float32, device=device),
+        ]
+    )
+
+    if invert_targets:
+        targets = torch.ones_like(targets) - targets
+
+    h_all = torch.cat([h_x, h_c], dim=0)
+
+    logits = discriminator(h_all).squeeze(-1)
+    loss = F.binary_cross_entropy_with_logits(logits, targets)
+
+    preds = (logits > 0.5).long()
+    acc = torch.sum(preds == targets).float() / preds.shape[0]
+
+    metrics = {"discr/loss": loss, "discr/acc": acc}
+    if invert_targets:
+        metrics = None
+
+    return loss, metrics

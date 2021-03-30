@@ -101,6 +101,10 @@ def parse_args(args=None):
     parser.add_argument("--evaluate-on", default="validation", type=str,
                         help="a split name to evaluate the model on")
 
+    # adversarial
+    parser.add_argument("--discriminator-update-freq", default=None, type=int)
+    parser.add_argument("--discr-lr", default=None, type=int)
+
     # misc
     parser.add_argument("--device", default=None)
     parser.add_argument("--debug", default=False, action="store_true",
@@ -144,6 +148,9 @@ def parse_args(args=None):
     if args.classes_entropy_reg is not None:
         if args.glove is None:
             raise NotImplementedError("--classes-entropy-reg is only supported in --glove mode")
+
+    if args.discr_lr is None and args.discriminator_update_freq is not None:
+        args.discr_lr = args.lr
 
     return args
 
@@ -220,6 +227,15 @@ def main(args):
     parameters = model.get_trainable_parameters()
     optimizer = torch.optim.Adam(parameters, lr=args.lr)
 
+    discriminator = None
+    discriminator_optimizer = None
+    if args.discriminator_update_freq is not None:
+        discriminator = cat.modelling_utils.make_mlp(
+            n_layers=3, input_size=model.final_hidden_size, hidden_size=1024, output_size=1
+        )
+        discriminator.to(args.device)
+        discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), lr=args.discr_lr)
+
     logger.info("Starting training")
     wandb.watch(model, log="all")
     wandb.log({"model_description": wandb.Html(cat.utils.monospace_html(repr(model)))})
@@ -260,6 +276,9 @@ def main(args):
         save_path=args.save_to,
         eval_every_steps=args.eval_every_steps,
         label_smoothing=args.label_smoothing,
+        discriminator=discriminator,
+        discriminator_optimizer=discriminator_optimizer,
+        discriminator_update_freq=args.discriminator_update_freq,
         **extra_kwargs,
     )
 

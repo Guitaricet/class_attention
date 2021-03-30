@@ -335,11 +335,11 @@ def get_class_vectors(model, train_classes_str, test_classes_str, label_tokenize
     # 5 because it is not a special token and because it is small
     fake_text_ids = torch.LongTensor([[5]]).to(device)  # (batch=1, seq=1)
 
-    _, train_classes_h = model(
-        text_input=fake_text_ids, labels_input=train_classes_ids, return_class_embeddings=True
+    _, _, train_classes_h = model(
+        text_input=fake_text_ids, labels_input=train_classes_ids, return_embeddings=True
     )
-    _, test_classes_h = model(
-        text_input=fake_text_ids, labels_input=test_classes_ids, return_class_embeddings=True
+    _, _, test_classes_h = model(
+        text_input=fake_text_ids, labels_input=test_classes_ids, return_embeddings=True
     )
 
     return train_classes_h, test_classes_h

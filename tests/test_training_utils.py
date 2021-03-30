@@ -203,6 +203,49 @@ def test_train_cat_model_class_reg():
     )
 
 
+def test_train_cat_model_discriminator():
+    (
+        train_dataloader,
+        test_dataloader,
+        all_classes_str,
+        test_classes_str,
+        data,
+    ) = tests.utils.default_prepare_dataloaders()
+
+    text_encoder = cat.modelling_utils.get_small_transformer()
+    label_encoder = cat.modelling_utils.get_small_transformer()
+    model = cat.ClassAttentionModel(
+        text_encoder,
+        label_encoder,
+        n_projection_layers=1,
+        hidden_size=13,
+    )
+
+    discriminator = cat.modelling_utils.make_mlp(
+        n_layers=2,
+        input_size=model.final_hidden_size,
+        hidden_size=16,
+        output_size=1,
+    )
+
+    model_optimizer = torch.optim.Adam(model.get_trainable_parameters(), lr=1e-4)
+    discriminator_opt = torch.optim.Adam(discriminator.parameters(), lr=1e-4)
+
+    cat.training_utils.train_cat_model(
+        model=model,
+        model_optimizer=model_optimizer,
+        train_dataloader=train_dataloader,
+        test_dataloader=test_dataloader,
+        all_classes_str=all_classes_str,
+        test_classes_str=test_classes_str,
+        max_epochs=1,
+        device="cpu",
+        discriminator=discriminator,
+        discriminator_optimizer=discriminator_opt,
+        discriminator_update_freq=2,
+    )
+
+
 def test_make_extra_classes_dataloader_from_glove():
     tests.utils.make_glove_file()
 
