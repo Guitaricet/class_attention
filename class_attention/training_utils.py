@@ -1,10 +1,10 @@
 """
 Functions used in the training script
 """
-
 import logging
 import os
 import sys
+from random import random
 
 import torch
 import torch.nn as nn
@@ -285,6 +285,30 @@ def make_extra_classes_dataloader_from_glove(
     return dataloader
 
 
+def make_extra_classes_dataloader_from_file(
+    file_path,
+    tokenizer,
+    batch_size,
+):
+    """Creates a dataloader that will
+
+    Args:
+        file_path: path to a text file containing class name on every line
+        tokenizer: transformers.tokenizer
+        batch_size: int
+
+    Returns:
+        torch.DataLoader(cat.CatDataset, batch_size=batch_size)
+    """
+    with open(file_path) as f:
+        class_names = f.read().splitlines()
+
+    words_dataset = cat.CatDataset(class_names, tokenizer)
+    collator = cat.CatCollator(pad_token_id=tokenizer.pad_token_id)
+    dataloader = DataLoader(words_dataset, collate_fn=collator, batch_size=batch_size, shuffle=True)
+    return dataloader
+
+
 def train_cat_model(
     model: cat.ClassAttentionModel,
     model_optimizer,
@@ -300,7 +324,6 @@ def train_cat_model(
     extra_examples_dataloader=None,
     examples_entropy_reg=None,
     extra_classes_dataloader=None,
-    classes_entropy_reg=None,
     eval_every_steps=None,
     label_smoothing=None,
     discriminator=None,
@@ -330,7 +353,6 @@ def train_cat_model(
         extra_examples_dataloader = cat.utils.infinite_iterator(extra_examples_dataloader)
 
     if extra_classes_dataloader is not None:
-        assert classes_entropy_reg is not None
         extra_classes_dataloader = cat.utils.infinite_iterator(extra_classes_dataloader)
 
     if label_smoothing is not None and label_smoothing > 0:
@@ -377,18 +399,18 @@ def train_cat_model(
                 epoch=epoch,
                 extra_examples_dataloader=extra_examples_dataloader,
                 examples_entropy_reg=examples_entropy_reg,
-                extra_classes_dataloader=extra_classes_dataloader,
-                classes_entropy_reg=classes_entropy_reg,
             )
 
             is_discriminator_update_step = global_step % discriminator_update_freq == 0
 
             if discriminator is not None and not is_discriminator_update_step:
                 # use adversarial loss to update the network
+                _h_c = maybe_compute_new_hc(x, h_c, model, extra_classes_dataloader)
+
                 anti_discriminator_loss, _ = get_discriminator_loss_from_h(
                     discriminator,
                     h_x,
-                    h_c,
+                    _h_c,
                     invert_targets=True,
                 )
                 model_loss += anti_discriminator_loss
@@ -402,12 +424,15 @@ def train_cat_model(
             model_optimizer.step()
 
             if discriminator is not None and is_discriminator_update_step:
+                # train discriminator
                 discriminator_optimizer.zero_grad()
+
+                _h_c = maybe_compute_new_hc(x, h_c, model, extra_classes_dataloader)
 
                 discriminator_loss, discriminator_metrics = get_discriminator_loss_from_h(
                     discriminator,
                     h_x.detach(),
-                    h_c.detach(),
+                    _h_c.detach(),
                 )
                 if wandb.run is not None:
                     wandb.log(discriminator_metrics)
@@ -490,6 +515,31 @@ def train_cat_model(
     return model
 
 
+def maybe_compute_new_hc(x, h_c, model, extra_classes_dataloader, real_hc_prob=0.5):
+    # NOTE: `x` is a dirty and lazy hack so we don't have to figure out some text input
+    # (remember that the model requires both text and class input and we can't just forward classes
+    # and just getting the h_c is not implemented ¯\_(ツ)_/¯)
+    if extra_classes_dataloader is None or random() < real_hc_prob:
+        return h_c
+
+    x = x[0].unsqueeze(0)
+    c, _ = next(extra_classes_dataloader)
+    if c.shape[0] == 1:
+        c, _ = next(extra_classes_dataloader)
+
+    if c.shape[0] == 1:
+        logger.warning("Only one class is returned two times in a row, falling back to the original h_c")
+        return h_c
+
+    c = c.to(x.device)
+
+    _, _, h_c = model(
+        text_input=x, labels_input=c, return_embeddings=True
+    )  # [batch_size, n_classes]
+
+    return h_c
+
+
 def validate_dataloader(dataloader: DataLoader, test_classes, is_test=False):
     if is_test:
         assert isinstance(dataloader.sampler, torch.utils.data.sampler.SequentialSampler)
@@ -523,36 +573,6 @@ def get_extra_examples_neg_entropy(extra_examples_dataloader, model, device):
 
     neg_entropy = F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)
     neg_entropy = torch.sum(neg_entropy) / examples_batch_size
-
-    return neg_entropy
-
-
-def get_extra_classes_neg_entropy(x, extra_classes_dataloader, model, device):
-    # NOTE: can we concat extra classes to the original `c`
-    # so you don't need to forward the model one more time?
-    #
-    # Use real data, but extra classes.
-    # Question: do we really need to sample real data?
-    # Answer: yes, because:
-    #     1. Look at the math
-    #     2. Intuition of this regularization is that
-    #     the model should not prefer any class for the example from a set of wrong classes
-
-    extra_c = next(extra_classes_dataloader)
-    if extra_c.shape[0] == 1:
-        logger.warning(
-            "Number of possible classes is 1, sampling from extra_classes_dataloader again"
-        )
-        # TODO: awful hack, what if the sampling is bad again?
-        extra_c = next(extra_classes_dataloader)
-
-    extra_c = extra_c.to(device)
-    n_classes = extra_c.shape[0]
-
-    logits = model(x, extra_c)
-
-    neg_entropy = F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1)
-    neg_entropy = torch.sum(neg_entropy) / n_classes
 
     return neg_entropy
 
@@ -609,8 +629,6 @@ def get_model_loss(
     epoch,
     extra_examples_dataloader=None,
     examples_entropy_reg=None,
-    extra_classes_dataloader=None,
-    classes_entropy_reg=None,
 ):
     """
     Computes a single forward step for the model (not the discriminator).
@@ -626,8 +644,6 @@ def get_model_loss(
         epoch: int
         extra_examples_dataloader: a dataloader with extra examples without labels (used to maximize entropy on them)
         examples_entropy_reg: extra examples entropy regularization coefficient
-        extra_classes_dataloader: a dataloader with extra labels without example (used to maximize entropy on them)
-        classes_entropy_reg: extra classes entropy regularization coefficient
 
     Returns:
         loss, metrics
@@ -686,11 +702,6 @@ def get_model_loss(
         total_loss += examples_entropy_reg * neg_entropy
         extra_metrics["train/extra_examples_entropy"] = -neg_entropy
 
-    if extra_classes_dataloader:
-        neg_entropy = get_extra_classes_neg_entropy(x, extra_classes_dataloader, model, device)
-        total_loss += classes_entropy_reg * neg_entropy
-        extra_metrics["train/extra_classes_entropy"] = -neg_entropy
-
     metrics = {
         "train/acc": acc,
         "train/loss": total_loss,
@@ -720,11 +731,11 @@ def _check_discriminator_triplet(
             raise ValueError("Provide discriminator_update_freq")
 
         if discriminator_update_freq < 2:
-            raise ValueError("Discriminator update freq should be above 1, "
-                             "because the model gets adversarial loss on the steps "
-                             "when we do not update the discriminator. "
-                             "If update freq = 1 then the model does not get "
-                             "adversarial loss at all (only the discriminator does)")
+            raise ValueError(
+                "Discriminator update freq should be above 1, because the model gets adversarial loss on the steps "
+                "when we do not update the discriminator. If update freq = 1 then the model does not get adversarial "
+                "loss at all (only the discriminator does)"
+            )
 
 
 def get_discriminator_loss_from_h(discriminator, h_x, h_c, invert_targets=False):

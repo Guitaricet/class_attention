@@ -6,6 +6,7 @@ import class_attention as cat
 from tests.test_training_utils import DATASET
 
 GLOVE_TMP_PATH = "glove.glove"
+EXTRA_CLASSES_TMP_PATH = "extra_classes.txt"
 CLASS_NAMES = {
     "ARTS",
     "ARTS & CULTURE",
@@ -69,6 +70,16 @@ def make_glove_file():
 
 def delete_glove_file():
     os.remove(GLOVE_TMP_PATH)
+
+
+def make_extra_classes_file():
+    with open(EXTRA_CLASSES_TMP_PATH, "w") as f:
+        for class_name in CLASS_NAMES:
+            f.write(class_name + "\n")
+
+
+def delete_extra_classes_file():
+    os.remove(EXTRA_CLASSES_TMP_PATH)
 
 
 def model_factory(txt_encoder_kwargs=None, cls_encoder_kwargs=None, model_kwargs=None):

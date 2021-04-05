@@ -88,13 +88,14 @@ def parse_args(args=None):
     parser.add_argument("--early-stopping", default=None, type=int)
     parser.add_argument("--examples-entropy-reg", default=None, type=float,
                         help="maximize the entropy of the predicted distribution on unknown **examples**")
-    parser.add_argument("--classes-entropy-reg", default=None, type=float,
-                        help="maximize the entropy of the predicted distribution on unknown **classes**")
+    parser.add_argument("--extra-classes-file", default=None, type=str,
+                        help="path to a text file with extra class names (one name on every line), "
+                             "used for adversarial regularization")
+    parser.add_argument("--extra-classes-batch-size", default=None, type=int,
+                        help="the number of extra classes to compute the regularization term")
     parser.add_argument("--regularize-with-real-classes", default=False, action="store_true",
                         help="use real zero-shot classes to maximize the entropy of P(Zero|x_Multi). "
                              "Not practical, serves as oracle/sanity check.")
-    parser.add_argument("--classes-entropy-batch-size", default=None, type=int,
-                        help="the number of extra classes to compute the regularization term")
     parser.add_argument("--eval-every-steps", default=None, type=int,
                         help="evaluate model each --eval-every-steps steps; does not affect early stopping")
     parser.add_argument("--label-smoothing", default=None, type=float)
@@ -144,10 +145,6 @@ def parse_args(args=None):
 
     if args.random_cls_vectors is not None and args.hidden_size is None:
         raise ValueError("you should provide --hidden-size with --random-cls-vectors")
-
-    if args.classes_entropy_reg is not None:
-        if args.glove is None:
-            raise NotImplementedError("--classes-entropy-reg is only supported in --glove mode")
 
     if args.discr_lr is None and args.discriminator_update_freq is not None:
         args.discr_lr = args.lr
@@ -236,7 +233,6 @@ def main(args):
         discriminator.to(args.device)
         discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), lr=args.discr_lr)
 
-    logger.info("Starting training")
     wandb.watch(model, log="all")
     wandb.log({"model_description": wandb.Html(cat.utils.monospace_html(repr(model)))})
 
@@ -249,16 +245,14 @@ def main(args):
     if args.examples_entropy_reg:
         extra_kwargs["extra_examples_dataloader"] = zero_shot_dataloader
         extra_kwargs["examples_entropy_reg"] = args.examples_entropy_reg
-    if args.classes_entropy_reg:
-        assert isinstance(label_encoder, cat.modelling.PreTrainedEmbeddingEncoder)
+    if args.extra_classes_file:
         # fmt: off
-        extra_kwargs["extra_classes_dataloader"] = cat.training_utils.make_extra_classes_dataloader_from_glove(
-            glove_path=args.glove,
-            batch_size=args.classes_entropy_batch_size or args.batch_size // 2,
-            class_names=all_classes_str if args.regularize_with_real_classes else None,
+        extra_kwargs["extra_classes_dataloader"] = cat.training_utils.make_extra_classes_dataloader_from_file(
+            file_path=args.extra_classes_file,
+            tokenizer=test_dataloader.dataset.label_tokenizer,
+            batch_size=args.extra_classes_batch_size or args.batch_size // 2,
         )
         # fmt: on
-        extra_kwargs["classes_entropy_reg"] = args.classes_entropy_reg
 
     logger.info("Starting training")
 
