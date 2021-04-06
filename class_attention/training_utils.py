@@ -515,7 +515,7 @@ def train_cat_model(
     return model
 
 
-def maybe_compute_new_hc(x, h_c, model, extra_classes_dataloader, real_hc_prob=0.5):
+def maybe_compute_new_hc(x, h_c, model, extra_classes_dataloader, real_hc_prob=0.1):
     # NOTE: `x` is a dirty and lazy hack so we don't have to figure out some text input
     # (remember that the model requires both text and class input and we can't just forward classes
     # and just getting the h_c is not implemented ¯\_(ツ)_/¯)
