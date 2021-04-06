@@ -421,6 +421,7 @@ def train_cat_model(
                 wandb.log(training_step_metrics)
 
             model_loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
             model_optimizer.step()
 
             if discriminator is not None and is_discriminator_update_step:
@@ -438,6 +439,7 @@ def train_cat_model(
                     wandb.log(discriminator_metrics)
 
                 discriminator_loss.backward()
+                torch.nn.utils.clip_grad_norm_(discriminator.parameters(), 5.0)
                 discriminator_optimizer.step()
 
             is_eval_step = eval_every_steps is not None and global_step % eval_every_steps == 0
