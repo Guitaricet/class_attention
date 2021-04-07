@@ -73,7 +73,7 @@ class CatDataset(torch.utils.data.Dataset):
         Returns:
             torch.Tensor[text_len,]
         """
-        return self.encode_via_tokenizer(text, self.text_tokenizer, max_length=self.max_text_len)
+        return self.encode_via_tokenizer(text, self.text_tokenizer, max_length=self.max_text_len, truncation=True)
 
     def _convert_label_to_tensor(self, label_str):
         return self.encode_via_tokenizer(label_str, self.label_tokenizer)
