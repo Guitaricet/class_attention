@@ -329,6 +329,7 @@ def train_cat_model(
     discriminator=None,
     discriminator_optimizer=None,
     discriminator_update_freq=None,
+    class_cos2_reg=None,
 ):
     _check_discriminator_triplet(discriminator, discriminator_optimizer, discriminator_update_freq)
 
@@ -399,6 +400,7 @@ def train_cat_model(
                 epoch=epoch,
                 extra_examples_dataloader=extra_examples_dataloader,
                 examples_entropy_reg=examples_entropy_reg,
+                class_vec_cos_reg=class_cos2_reg,
             )
 
             is_discriminator_update_step = global_step % discriminator_update_freq == 0
@@ -631,6 +633,7 @@ def get_model_loss(
     epoch,
     extra_examples_dataloader=None,
     examples_entropy_reg=None,
+    class_vec_cos_reg=None,
 ):
     """
     Computes a single forward step for the model (not the discriminator).
@@ -696,13 +699,21 @@ def get_model_loss(
     # TODO: average text vectors with the same class
     # then compute the transposed cross entropy
 
-    # Regularization
+    # Entropy regularization
     extra_metrics = dict()
     if extra_examples_dataloader is not None:
         neg_entropy = get_extra_examples_neg_entropy(extra_examples_dataloader, model, device)
 
         total_loss += examples_entropy_reg * neg_entropy
         extra_metrics["train/extra_examples_entropy"] = -neg_entropy
+
+    # Similarity regularization
+    # minimizing the cosine similarity should make the vectors more orthogonal
+    cos2 = cat.modelling_utils.cos2(h_c)
+    extra_metrics["train/class_embed_similarity"] = cos2
+
+    if class_vec_cos_reg is not None:
+        total_loss += class_vec_cos_reg * cos2
 
     metrics = {
         "train/acc": acc,

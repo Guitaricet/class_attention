@@ -70,22 +70,32 @@ def parse_args(args=None):
                         help="use random vectors as class vectors (aka untrained word2vec), "
                              "vector size equals to --hidden-size, used as a sanity check / baseline.")
 
-    # training
+    # --- Training
     parser.add_argument("--max-epochs", default=10, type=int)
+    parser.add_argument("--early-stopping", default=None, type=int)
     parser.add_argument("--batch-size", default=32, type=int)
     parser.add_argument("--lr", default=1e-4, type=float)
     parser.add_argument("--dropout", default=0.1, type=float)
+    parser.add_argument("--eval-every-steps", default=None, type=int,
+                        help="evaluate model each --eval-every-steps steps; does not affect early stopping")
+    parser.add_argument("--label-smoothing", default=None, type=float)
+    parser.add_argument("--evaluate-on", default="validation", type=str,
+                        help="a split name to evaluate the model on")
+
+    # Layer freezing and parameter sharing
     parser.add_argument("--freeze-projections", default=False, action="store_true",
                         help="do not train cls_out and txt_out")
     parser.add_argument("--freeze-cls-network", default=False, action="store_true")
     parser.add_argument("--freeze-txt-network", default=False, action="store_true")
     parser.add_argument("--freeze-cls-embeddings", default=False, action="store_true")
     parser.add_argument("--share-txt-cls-network-params", default=False, action="store_true")
+
+    # --- Regularization
+    # Extra classes and entropy reg
     parser.add_argument("--p-extra-classes", default=0, type=float,
                         help="proportion of extra classes to feed into the model during of training at every batch")
     parser.add_argument("--p-no-class", default=0, type=float,
                         help="proportion of labels to randomly drop in the batch")
-    parser.add_argument("--early-stopping", default=None, type=int)
     parser.add_argument("--examples-entropy-reg", default=None, type=float,
                         help="maximize the entropy of the predicted distribution on unknown **examples**")
     parser.add_argument("--extra-classes-file", default=None, type=str,
@@ -96,17 +106,16 @@ def parse_args(args=None):
     parser.add_argument("--regularize-with-real-classes", default=False, action="store_true",
                         help="use real zero-shot classes to maximize the entropy of P(Zero|x_Multi). "
                              "Not practical, serves as oracle/sanity check.")
-    parser.add_argument("--eval-every-steps", default=None, type=int,
-                        help="evaluate model each --eval-every-steps steps; does not affect early stopping")
-    parser.add_argument("--label-smoothing", default=None, type=float)
-    parser.add_argument("--evaluate-on", default="validation", type=str,
-                        help="a split name to evaluate the model on")
 
-    # adversarial
+    # Other kinds of regularization
+    parser.add_argument("--class-cos2-reg", default=None, type=float,
+                        help="Add cos^2 between class embeddings to the loss, weight by this value")
+
+    # Adversarial
     parser.add_argument("--discriminator-update-freq", default=None, type=int)
     parser.add_argument("--discr-lr", default=None, type=int)
 
-    # misc
+    # --- Misc
     parser.add_argument("--device", default=None)
     parser.add_argument("--debug", default=False, action="store_true",
                         help="overrides the arguments for a faster run (smaller model, smaller dataset)")
@@ -273,6 +282,7 @@ def main(args):
         discriminator=discriminator,
         discriminator_optimizer=discriminator_optimizer,
         discriminator_update_freq=args.discriminator_update_freq,
+        class_cos2_reg=args.class_cos2_reg,
         **extra_kwargs,
     )
 
