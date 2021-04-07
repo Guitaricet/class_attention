@@ -5,9 +5,6 @@ import tokenizers
 from tqdm.auto import tqdm
 
 
-import class_attention as cat
-
-
 class CatDataset(torch.utils.data.Dataset):
     """
     A Dataset object to handle turning numericalized text into count tensors.
@@ -73,20 +70,21 @@ class CatDataset(torch.utils.data.Dataset):
         Returns:
             torch.Tensor[text_len,]
         """
-        return self.encode_via_tokenizer(text, self.text_tokenizer, max_length=self.max_text_len, truncation=True)
+        return self.encode_via_tokenizer(text, self.text_tokenizer, max_length=self.max_text_len)
 
     def _convert_label_to_tensor(self, label_str):
         return self.encode_via_tokenizer(label_str, self.label_tokenizer)
 
     @staticmethod
     def encode_via_tokenizer(string_to_encode, tokenizer, max_length=None) -> torch.LongTensor:
+        truncation = bool(max_length is not None)
         if isinstance(tokenizer, tokenizers.Tokenizer):
             ids_numpy = tokenizer.encode(string_to_encode).ids
         else:
             # the case of transformers Tokenizer or GloVeTokenizer
             # (the latter ignores max_length, but it is only applied to
             # class names so it is not supposed to used max_length!=None)
-            ids_numpy = tokenizer.encode(string_to_encode, max_length=max_length)
+            ids_numpy = tokenizer.encode(string_to_encode, max_length=max_length, truncation=truncation)
 
         ids_torch = torch.LongTensor(ids_numpy)
         return ids_torch
