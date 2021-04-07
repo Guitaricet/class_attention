@@ -106,14 +106,15 @@ def parse_args(args=None):
     parser.add_argument("--regularize-with-real-classes", default=False, action="store_true",
                         help="use real zero-shot classes to maximize the entropy of P(Zero|x_Multi). "
                              "Not practical, serves as oracle/sanity check.")
+    # Adversarial
+    parser.add_argument("--discriminator-update-freq", default=None, type=int)
+    parser.add_argument("--discr-lr", default=None, type=int)
+    parser.add_argument("--adv-reg-weight", default=1.0, type=float,
+                        help="A regularization strength for the model (not the discriminator) part of the loss")
 
     # Other kinds of regularization
     parser.add_argument("--class-cos2-reg", default=None, type=float,
                         help="Add cos^2 between class embeddings to the loss, weight by this value")
-
-    # Adversarial
-    parser.add_argument("--discriminator-update-freq", default=None, type=int)
-    parser.add_argument("--discr-lr", default=None, type=int)
 
     # --- Misc
     parser.add_argument("--device", default=None)
@@ -283,6 +284,7 @@ def main(args):
         discriminator_optimizer=discriminator_optimizer,
         discriminator_update_freq=args.discriminator_update_freq,
         class_cos2_reg=args.class_cos2_reg,
+        adv_reg_weight=args.adv_reg_weight,
         **extra_kwargs,
     )
 

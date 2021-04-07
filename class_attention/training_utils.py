@@ -310,6 +310,7 @@ def train_cat_model(
     discriminator_optimizer=None,
     discriminator_update_freq=None,
     class_cos2_reg=None,
+    adv_reg_weight=1.0,
 ):
     _check_discriminator_triplet(discriminator, discriminator_optimizer, discriminator_update_freq)
 
@@ -395,7 +396,7 @@ def train_cat_model(
                     _h_c,
                     invert_targets=True,
                 )
-                model_loss += anti_discriminator_loss
+                model_loss += adv_reg_weight * anti_discriminator_loss
                 training_step_metrics["train/loss"] = model_loss  # overrides the existing value
                 training_step_metrics["train/adversarial_reg"] = anti_discriminator_loss
 
