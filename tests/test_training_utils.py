@@ -252,17 +252,3 @@ def test_train_cat_model_extra_classes():
         discriminator_update_freq=2,
         extra_classes_dataloader=extra_classes_dataloader,
     )
-
-
-def test_make_extra_classes_dataloader_from_glove():
-    tests.utils.make_glove_file()
-
-    dataloader = cat.training_utils.make_extra_classes_dataloader_from_glove(
-        tests.utils.GLOVE_TMP_PATH, batch_size=7
-    )
-    tests.utils.delete_glove_file()
-
-    batch = next(iter(dataloader))
-
-    assert isinstance(batch, torch.Tensor)
-    assert batch.shape == (7, 1)  # figure out the numbers

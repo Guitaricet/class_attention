@@ -265,26 +265,6 @@ def prepare_dataloaders(
     return train_dataloader, test_dataloader, all_classes_str, test_classes_str, data
 
 
-def make_extra_classes_dataloader_from_glove(
-    glove_path,
-    batch_size,
-    class_names=None,
-):
-    _, word2id = cat.utils.load_glove_from_file(glove_path)
-    label_tokenizer = cat.utils.GloVeTokenizer(word2id)
-    if class_names is None:
-        words = cat.utils.filter_words(word2id.keys(), extra_filter=lambda x: x != "[PAD]")
-        words_dataset = cat.CatDataset(words, label_tokenizer)
-    else:
-        # NOTE: some of the class names can have length > 1
-        # DataLoader won't be able to collate them with the default collator
-        class_names = [c.lower() for c in class_names]
-        words_dataset = cat.CatDataset(class_names, label_tokenizer)
-
-    dataloader = DataLoader(words_dataset, batch_size=batch_size, shuffle=True)
-    return dataloader
-
-
 def make_extra_classes_dataloader_from_file(
     file_path,
     tokenizer,
