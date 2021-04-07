@@ -39,7 +39,7 @@ def normalize_embeds(embeds):
 def cos2(embeds):
     e_normed = normalize_embeds(embeds)
     sim = torch.pow(e_normed @ e_normed.T, 2)  # cos^2
-    sim.sub_(torch.eye(sim.shape[0]))  # remove the diagonal which is always 1
+    sim.sub_(torch.eye(sim.shape[0], device=sim.device, dtype=sim.dtype))  # remove the diagonal which is always 1
     sim = sim.sum() / 2.  # divide by two, because the similarity matrix is symmetric
     return sim
 
