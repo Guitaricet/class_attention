@@ -182,6 +182,7 @@ def test_train_cat_model_discriminator():
         input_size=model.final_hidden_size,
         hidden_size=16,
         output_size=1,
+        spectral_normalization=True,
     )
 
     model_optimizer = torch.optim.Adam(model.get_trainable_parameters(), lr=1e-4)
@@ -225,6 +226,7 @@ def test_train_cat_model_extra_classes():
         input_size=model.final_hidden_size,
         hidden_size=16,
         output_size=1,
+        spectral_normalization=True,
     )
 
     model_optimizer = torch.optim.Adam(model.get_trainable_parameters(), lr=1e-4)

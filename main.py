@@ -111,6 +111,8 @@ def parse_args(args=None):
     parser.add_argument("--discr-lr", default=None, type=int)
     parser.add_argument("--adv-reg-weight", default=1.0, type=float,
                         help="A regularization strength for the model (not the discriminator) part of the loss")
+    parser.add_argument("--wasserstein", default=False, action="store_true",
+                        help="Use Wasserstein-style loss for adversarial regularization")
 
     # Other kinds of regularization
     parser.add_argument("--class-cos2-reg", default=None, type=float,
@@ -238,10 +240,15 @@ def main(args):
     discriminator_optimizer = None
     if args.discriminator_update_freq is not None:
         discriminator = cat.modelling_utils.make_mlp(
-            n_layers=3, input_size=model.final_hidden_size, hidden_size=1024, output_size=1
+            n_layers=3,
+            input_size=model.final_hidden_size,
+            hidden_size=1024,
+            output_size=1,
+            spectral_normalization=True,
         )
         discriminator.to(args.device)
-        discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), lr=args.discr_lr)
+        # hparams from https://arxiv.org/abs/1704.00028
+        discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), lr=args.discr_lr, betas=(0., 0.9))
 
     wandb.watch(model, log="all")
     wandb.log({"model_description": wandb.Html(cat.utils.monospace_html(repr(model)))})
@@ -285,6 +292,7 @@ def main(args):
         discriminator_update_freq=args.discriminator_update_freq,
         class_cos2_reg=args.class_cos2_reg,
         adv_reg_weight=args.adv_reg_weight,
+        use_wasserstein_loss=args.wasserstein,
         **extra_kwargs,
     )
 

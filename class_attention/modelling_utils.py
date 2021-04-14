@@ -39,8 +39,10 @@ def normalize_embeds(embeds):
 def cos2(embeds):
     e_normed = normalize_embeds(embeds)
     sim = torch.pow(e_normed @ e_normed.T, 2)  # cos^2
-    sim.sub_(torch.eye(sim.shape[0], device=sim.device, dtype=sim.dtype))  # remove the diagonal which is always 1
-    sim = sim.sum() / 2.  # divide by two, because the similarity matrix is symmetric
+    sim.sub_(
+        torch.eye(sim.shape[0], device=sim.device, dtype=sim.dtype)
+    )  # remove the diagonal which is always 1
+    sim = sim.sum() / 2.0  # divide by two, because the similarity matrix is symmetric
     return sim
 
 
@@ -52,6 +54,7 @@ def make_mlp(
     use_bias=True,
     activation_fn=None,
     dropout=0,
+    spectral_normalization=False,
 ):
     if not isinstance(n_layers, int):
         raise ValueError(f"n_layers should be int, got {type(n_layers)} instead")
@@ -60,20 +63,27 @@ def make_mlp(
     if activation_fn is None:
         activation_fn = nn.ReLU
 
+    linear = nn.Linear
+    if spectral_normalization:
+
+        def linear(*args, **kwargs):
+            return nn.utils.spectral_norm(nn.Linear(*args, **kwargs))
+
     output_size = output_size or hidden_size
 
     if n_layers == 1:
-        return nn.Linear(input_size, output_size, bias=use_bias)
+        return linear(input_size, output_size, bias=use_bias)
 
     layers = [
-        nn.Linear(input_size, hidden_size),
+        linear(input_size, hidden_size),
     ]
     for _ in range(n_layers - 2):
-        layers.append(nn.Dropout(dropout))
+        if dropout > 0:
+            layers.append(nn.Dropout(dropout))
         layers.append(activation_fn())
-        layers.append(nn.Linear(hidden_size, hidden_size, bias=use_bias))
+        layers.append(linear(hidden_size, hidden_size, bias=use_bias))
 
-    layers.append(nn.Linear(hidden_size, output_size, bias=use_bias))
+    layers.append(linear(hidden_size, output_size, bias=use_bias))
 
     model = nn.Sequential(*layers)
     return model

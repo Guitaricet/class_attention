@@ -311,6 +311,7 @@ def train_cat_model(
     discriminator_update_freq=None,
     class_cos2_reg=None,
     adv_reg_weight=1.0,
+    use_wasserstein_loss=False,
 ):
     _check_discriminator_triplet(discriminator, discriminator_optimizer, discriminator_update_freq)
 
@@ -395,6 +396,7 @@ def train_cat_model(
                     h_x,
                     _h_c,
                     invert_targets=True,
+                    wasserstein_loss=use_wasserstein_loss,
                 )
                 model_loss += adv_reg_weight * anti_discriminator_loss
                 training_step_metrics["train/loss"] = model_loss  # overrides the existing value
@@ -417,6 +419,7 @@ def train_cat_model(
                     discriminator,
                     h_x.detach(),
                     _h_c.detach(),
+                    wasserstein_loss=use_wasserstein_loss,
                 )
                 if wandb.run is not None:
                     wandb.log(discriminator_metrics)
@@ -732,7 +735,7 @@ def _check_discriminator_triplet(
             )
 
 
-def get_discriminator_loss_from_h(discriminator, h_x, h_c, invert_targets=False):
+def get_discriminator_loss_from_h(discriminator, h_x, h_c, invert_targets=False, wasserstein_loss=False):
     """Computes the loss to train the discriminator (invert_targets=False) or
     to train the adversary (invert_targets=True).
 
@@ -752,8 +755,8 @@ def get_discriminator_loss_from_h(discriminator, h_x, h_c, invert_targets=False)
 
     targets = torch.cat(
         [
-            torch.ones(n_texts, dtype=torch.float32, device=device),
-            torch.zeros(n_classes, dtype=torch.float32, device=device),
+            torch.zeros(n_texts, dtype=torch.float32, device=device),
+            torch.ones(n_classes, dtype=torch.float32, device=device),
         ]
     )
 
@@ -762,10 +765,18 @@ def get_discriminator_loss_from_h(discriminator, h_x, h_c, invert_targets=False)
 
     h_all = torch.cat([h_x, h_c], dim=0)
 
-    logits = discriminator(h_all).squeeze(-1)
-    loss = F.binary_cross_entropy_with_logits(logits, targets)
+    logits = discriminator(h_all).squeeze(-1)  # [batch_size + n_classes, 1]
 
-    preds = (logits > 0.5).long()
+    if not wasserstein_loss:
+        # usual GAN-like loss
+        loss = F.binary_cross_entropy_with_logits(logits, targets)
+    else:
+        # Wasserstein GAN-like loss
+        text_logits, class_logits = torch.split(logits, [n_texts, n_classes])
+        # loss = (d_fake - d_real).mean()
+        loss = text_logits.mean() - class_logits.mean()
+
+    preds = (F.sigmoid(logits) > 0.5).long()
     acc = torch.sum(preds == targets).float() / preds.shape[0]
 
     metrics = {"discr/loss": loss, "discr/acc": acc}
