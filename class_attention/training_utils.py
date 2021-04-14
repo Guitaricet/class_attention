@@ -765,7 +765,7 @@ def get_discriminator_loss_from_h(discriminator, h_x, h_c, invert_targets=False,
 
     h_all = torch.cat([h_x, h_c], dim=0)
 
-    logits = discriminator(h_all).squeeze(-1)  # [batch_size + n_classes, 1]
+    logits = discriminator(h_all).squeeze(-1)  # [batch_size + n_classes,]
 
     if not wasserstein_loss:
         # usual GAN-like loss
@@ -776,7 +776,8 @@ def get_discriminator_loss_from_h(discriminator, h_x, h_c, invert_targets=False,
         # loss = (d_fake - d_real).mean()
         loss = text_logits.mean() - class_logits.mean()
 
-    preds = (F.sigmoid(logits) > 0.5).long()
+    # preds are not entirely correct in case of
+    preds = (torch.sigmoid(logits) > 0.5).long()
     acc = torch.sum(preds == targets).float() / preds.shape[0]
 
     metrics = {"discr/loss": loss, "discr/acc": acc}

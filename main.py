@@ -113,6 +113,8 @@ def parse_args(args=None):
                         help="A regularization strength for the model (not the discriminator) part of the loss")
     parser.add_argument("--wasserstein", default=False, action="store_true",
                         help="Use Wasserstein-style loss for adversarial regularization")
+    parser.add_argument("--discriminator-hidden", default=1024, type=int)
+    parser.add_argument("--discriminator-layers", default=3, type=int)
 
     # Other kinds of regularization
     parser.add_argument("--class-cos2-reg", default=None, type=float,
@@ -240,9 +242,9 @@ def main(args):
     discriminator_optimizer = None
     if args.discriminator_update_freq is not None:
         discriminator = cat.modelling_utils.make_mlp(
-            n_layers=3,
+            n_layers=args.discriminator_layers,
             input_size=model.final_hidden_size,
-            hidden_size=1024,
+            hidden_size=args.discriminator_hidden,
             output_size=1,
             spectral_normalization=True,
         )
