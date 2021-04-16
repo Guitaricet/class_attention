@@ -113,6 +113,8 @@ def parse_args(args=None):
                         help="A regularization strength for the model (not the discriminator) part of the loss")
     parser.add_argument("--wasserstein", default=False, action="store_true",
                         help="Use Wasserstein-style loss for adversarial regularization")
+    parser.add_argument("--wasserstein-for-sweeps", default=None, type=int,
+                        help="Same as --wasserstein, but can be used with wandb sweeps. 1 for True and 0 for False")
     parser.add_argument("--discriminator-hidden", default=1024, type=int)
     parser.add_argument("--discriminator-layers", default=3, type=int)
 
@@ -162,6 +164,10 @@ def parse_args(args=None):
 
     if args.discr_lr is None and args.discriminator_update_freq is not None:
         args.discr_lr = args.lr
+
+    if args.wasserstein_for_sweeps is not None:
+        args.wasserstein = bool(int(args.wasserstein_for_sweeps))
+        args.wasserstein_for_sweeps = None
 
     return args
 

@@ -20,7 +20,7 @@ class CatDataset(torch.utils.data.Dataset):
         if labels is not None and len(texts) != len(labels):
             raise ValueError("classes and texts should have the same number of elements")
         if labels is not None and label_tokenizer is None:
-            raise ValueError("label_tokenizer should be provided with teh classes")
+            raise ValueError("label_tokenizer should be provided with the `labels`")
 
         if isinstance(text_tokenizer, tokenizers.Tokenizer):
             text_tokenizer.enable_truncation(max_length=max_text_len)
