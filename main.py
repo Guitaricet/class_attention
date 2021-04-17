@@ -97,7 +97,8 @@ def parse_args(args=None):
     # --- Regularization
     # Extra classes and entropy reg
     parser.add_argument("--p-extra-classes", default=0, type=float,
-                        help="proportion of extra classes to feed into the model during of training at every batch")
+                        help="proportion of extra classes to feed into the model during of training at every batch. "
+                             "Set to 1 to use all training classes in every batch.")
     parser.add_argument("--p-no-class", default=0, type=float,
                         help="proportion of labels to randomly drop in the batch")
     parser.add_argument("--examples-entropy-reg", default=None, type=float,
