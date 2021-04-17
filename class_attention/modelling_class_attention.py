@@ -41,6 +41,11 @@ class ClassAttentionModel(nn.Module):
         self.cls_out = nn.Identity()
         self.class_transformer = None
 
+        # the hidden layer that is used as a text and class representation
+        # the last layer (-1) is used by default
+        # 0 is the first transformer layer outputs
+        self.representation_layer = kwargs.get("representation_layer", -1)
+
         dropout = kwargs.get("dropout", 0.0)
         self.dropout_x = nn.Dropout(dropout ** 2)
         self.dropout_c = nn.Dropout(dropout ** 2)
@@ -153,12 +158,13 @@ class ClassAttentionModel(nn.Module):
         )
         cat.modelling_utils.validate_inputs(text_input, labels_input)
 
-        h_x = self.txt_encoder(**text_input)  # some tuple
-        h_x = h_x[0]  # FloatTensor[bs, text_seq_len, hidden]
+        h_x = self.txt_encoder(**text_input, output_hidden_states=True)  # model output object
+
+        h_x = h_x.hidden_states[self.representation_layer]  # FloatTensor[bs, text_seq_len, hidden]
         h_x = h_x[:, 0]  # get CLS token representations, FloatTensor[bs, hidden]
 
-        h_c = self.cls_encoder(**labels_input)  # some tuple
-        h_c = h_c[0]  # FloatTensor[n_classes, class_seq_len, hidden]
+        h_c = self.cls_encoder(**labels_input, output_hidden_states=True)  # some tuple
+        h_c = h_c.hidden_states[self.representation_layer]  # FloatTensor[n_classes, class_seq_len, hidden]
         h_c = h_c[:, 0]  # get CLS token representations, FloatTensor[n_classes, hidden]
 
         # maybe projections

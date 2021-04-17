@@ -53,6 +53,10 @@ def parse_args(args=None):
                         help="learn the softmax temperature as an additional scalar parameter")
     parser.add_argument("--remove-n-lowest-pc", default=0, type=int,
                         help="remove n lowest principal components from the class embeddings")
+    parser.add_argument("--representation-layer", default=-1, type=int,
+                        help="hidden layer representations to use for the text and class representations."
+                             "The last layer is used by default (-1). 0 means the first layer.")
+
     parser.add_argument("--n-projection-layers", default=None, type=int,
                         help="transform text embedding and class embedding using FCN with this many layers; "
                              "nonlinearity is not used if n=1")
@@ -106,6 +110,7 @@ def parse_args(args=None):
     parser.add_argument("--regularize-with-real-classes", default=False, action="store_true",
                         help="use real zero-shot classes to maximize the entropy of P(Zero|x_Multi). "
                              "Not practical, serves as oracle/sanity check.")
+
     # Adversarial
     parser.add_argument("--discriminator-update-freq", default=None, type=int)
     parser.add_argument("--discr-lr", default=None, type=int)
