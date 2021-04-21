@@ -1,6 +1,9 @@
+import pytest
 import torch
 import torch.utils.data
 import numpy as np
+
+from accelerate import Accelerator
 
 import class_attention as cat
 import tests.utils
@@ -8,6 +11,11 @@ import tests.utils
 np.random.seed(8)
 torch.manual_seed(41)
 DATASET = "Fraser/news-category-dataset"
+
+
+@pytest.fixture
+def accelerator():
+    return Accelerator()
 
 
 def test_prepare_dataset():
@@ -96,7 +104,7 @@ def test_prepare_dataloaders_glove():
     assert "test" in data
 
 
-def test_train_cat_model():
+def test_train_cat_model(accelerator):
     # this test becomes VERY slow if num_workers > 0
     (
         train_dataloader,
@@ -122,11 +130,11 @@ def test_train_cat_model():
         all_classes_str=all_classes_str,
         test_classes_str=test_classes_str,
         max_epochs=3,
-        device="cpu",
+        accelerator=accelerator,
     )
 
 
-def test_train_cat_model_nolabel():
+def test_train_cat_model_nolabel(accelerator):
     # this test becomes VERY slow if num_workers > 0
     (
         train_dataloader,
@@ -155,11 +163,11 @@ def test_train_cat_model_nolabel():
         all_classes_str=all_classes_str,
         test_classes_str=test_classes_str,
         max_epochs=3,
-        device="cpu",
+        accelerator=accelerator,
     )
 
 
-def test_train_cat_model_discriminator():
+def test_train_cat_model_discriminator(accelerator):
     (
         train_dataloader,
         test_dataloader,
@@ -196,14 +204,14 @@ def test_train_cat_model_discriminator():
         all_classes_str=all_classes_str,
         test_classes_str=test_classes_str,
         max_epochs=1,
-        device="cpu",
         discriminator=discriminator,
         discriminator_optimizer=discriminator_opt,
         discriminator_update_freq=2,
+        accelerator=accelerator,
     )
 
 
-def test_train_cat_model_extra_classes():
+def test_train_cat_model_extra_classes(accelerator):
     (
         train_dataloader,
         test_dataloader,
@@ -248,9 +256,9 @@ def test_train_cat_model_extra_classes():
         all_classes_str=all_classes_str,
         test_classes_str=test_classes_str,
         max_epochs=1,
-        device="cpu",
         discriminator=discriminator,
         discriminator_optimizer=discriminator_opt,
         discriminator_update_freq=2,
         extra_classes_dataloader=extra_classes_dataloader,
+        accelerator=accelerator,
     )

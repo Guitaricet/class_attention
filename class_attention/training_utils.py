@@ -297,7 +297,7 @@ def train_cat_model(
     all_classes_str,
     test_classes_str,
     max_epochs,
-    device=None,
+    accelerator,
     predict_into_file=None,
     early_stopping=None,
     save_path=None,
@@ -328,8 +328,7 @@ def train_cat_model(
             "No save path is provided, early stopping will not load the best model after training"
         )
 
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = accelerator.device
 
     if extra_examples_dataloader is not None:
         assert examples_entropy_reg is not None
@@ -366,9 +365,6 @@ def train_cat_model(
             global_step += 1
             model_optimizer.zero_grad()
 
-            x = x.to(device)
-            c = c.to(device)
-            y = y.to(device)
             verify_shapes(x, y, c)
 
             model_loss, h_x, h_c, training_step_metrics = get_model_loss(
@@ -377,7 +373,6 @@ def train_cat_model(
                 c=c,
                 y=y,
                 loss_fn=loss_fn,
-                device=device,
                 global_step=global_step,
                 epoch=epoch,
                 extra_examples_dataloader=extra_examples_dataloader,
@@ -405,7 +400,7 @@ def train_cat_model(
             if wandb.run is not None:
                 wandb.log(training_step_metrics)
 
-            model_loss.backward()
+            accelerator.backward(model_loss)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
             model_optimizer.step()
 
@@ -424,7 +419,7 @@ def train_cat_model(
                 if wandb.run is not None:
                     wandb.log(discriminator_metrics)
 
-                discriminator_loss.backward()
+                accelerator.backward(discriminator_loss)
                 torch.nn.utils.clip_grad_norm_(discriminator.parameters(), 5.0)
                 discriminator_optimizer.step()
 
@@ -516,7 +511,9 @@ def maybe_compute_new_hc(x, h_c, model, extra_classes_dataloader, real_hc_prob=0
         c, _ = next(extra_classes_dataloader)
 
     if c.shape[0] == 1:
-        logger.warning("Only one class is returned two times in a row, falling back to the original h_c")
+        logger.warning(
+            "Only one class is returned two times in a row, falling back to the original h_c"
+        )
         return h_c
 
     c = c.to(x.device)
@@ -612,7 +609,6 @@ def get_model_loss(
     c: torch.LongTensor,
     y: torch.LongTensor,
     loss_fn,
-    device,
     global_step,
     epoch,
     extra_examples_dataloader=None,
@@ -628,7 +624,6 @@ def get_model_loss(
         c: LongTensor[n_classes, class_seq_len], class representation
         y: LongTensor[batch_size,], targets
         loss_fn: function that accepts logits and targets and returns a scalar, e.g. cat.loss.LabelSmoothingLoss
-        device: torch.device
         global_step: int
         epoch: int
         extra_examples_dataloader: a dataloader with extra examples without labels (used to maximize entropy on them)
@@ -644,16 +639,17 @@ def get_model_loss(
     logits, h_x, h_c = model(
         text_input=x, labels_input=c, return_embeddings=True
     )  # [batch_size, n_classes]
+    device = logits.device
 
     # maximize the entropy of class distribution for the examples without the true label
     # compute cross entropy on the rest
     has_label_mask = y != -1  # [batch_size,]
 
-    total_loss = torch.tensor(0, dtype=torch.float32, device=device)
+    total_loss = torch.tensor(0, dtype=logits.dtype, device=device)
 
     ce_loss = None
     acc = None
-    if torch.sum(has_label_mask) > torch.tensor(1, device=has_label_mask.device):
+    if torch.sum(has_label_mask) > torch.tensor(1, device=device):
         # only use examples with the true label to compute cross-entropy loss
         ce_logits = logits[has_label_mask]
         y = y[has_label_mask]
@@ -735,7 +731,9 @@ def _check_discriminator_triplet(
             )
 
 
-def get_discriminator_loss_from_h(discriminator, h_x, h_c, invert_targets=False, wasserstein_loss=False):
+def get_discriminator_loss_from_h(
+    discriminator, h_x, h_c, invert_targets=False, wasserstein_loss=False
+):
     """Computes the loss to train the discriminator (invert_targets=False) or
     to train the adversary (invert_targets=True).
 
@@ -752,11 +750,12 @@ def get_discriminator_loss_from_h(discriminator, h_x, h_c, invert_targets=False,
     n_texts = h_x.shape[0]
     n_classes = h_c.shape[0]
     device = h_x.device
+    dtype = h_x.dtype
 
     targets = torch.cat(
         [
-            torch.zeros(n_texts, dtype=torch.float32, device=device),
-            torch.ones(n_classes, dtype=torch.float32, device=device),
+            torch.zeros(n_texts, dtype=dtype, device=device),
+            torch.ones(n_classes, dtype=dtype, device=device),
         ]
     )
 

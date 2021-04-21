@@ -9,6 +9,7 @@ import torch.utils.data
 import torch.nn.functional as F
 import transformers
 import wandb
+from accelerate import Accelerator
 
 import class_attention as cat
 
@@ -129,7 +130,7 @@ def parse_args(args=None):
                         help="Add cos^2 between class embeddings to the loss, weight by this value")
 
     # --- Misc
-    parser.add_argument("--device", default=None)
+    parser.add_argument("--fp16", default=False, action="store_true")
     parser.add_argument("--debug", default=False, action="store_true",
                         help="overrides the arguments for a faster run (smaller model, smaller dataset)")
     parser.add_argument("--predict-into-folder", default=None, type=str,
@@ -142,7 +143,6 @@ def parse_args(args=None):
                         help="wandb run name")
 
     args = parser.parse_args(args)
-    args.device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     args.tags = args.tags.split(",") if args.tags else []
 
     # fmt: on
@@ -184,6 +184,9 @@ def main(args):
     )
     args.text_field = text_field
     args.class_field = class_field
+
+    accelerator = Accelerator(fp16=args.fp16)
+    args.accelerator_device = accelerator.device
 
     wandb.init(project="class_attention", config=args, tags=args.tags, name=args.wandb_name)
     logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
@@ -245,10 +248,13 @@ def main(args):
         label_encoder,
         **vars(args),
     )
-    model = model.to(args.device)
 
     parameters = model.get_trainable_parameters()
     optimizer = torch.optim.Adam(parameters, lr=args.lr)
+
+    model, optimizer, train_dataloader, test_dataloader = accelerator.prepare(
+        model, optimizer, train_dataloader, test_dataloader
+    )
 
     discriminator = None
     discriminator_optimizer = None
@@ -260,9 +266,14 @@ def main(args):
             output_size=1,
             spectral_normalization=True,
         )
-        discriminator.to(args.device)
         # hparams from https://arxiv.org/abs/1704.00028
-        discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), lr=args.discr_lr, betas=(0., 0.9))
+        discriminator_optimizer = torch.optim.Adam(
+            discriminator.parameters(), lr=args.discr_lr, betas=(0.0, 0.9)
+        )
+
+        discriminator, discriminator_optimizer = accelerator.prepare(
+            discriminator, discriminator_optimizer
+        )
 
     wandb.watch(model, log="all")
     wandb.log({"model_description": wandb.Html(cat.utils.monospace_html(repr(model)))})
@@ -295,7 +306,7 @@ def main(args):
         all_classes_str=all_classes_str,
         test_classes_str=test_classes_str,
         max_epochs=args.max_epochs,
-        device=args.device,
+        accelerator=accelerator,
         predict_into_file=predict_into_file,
         early_stopping=args.early_stopping,
         save_path=args.save_to,
@@ -328,7 +339,7 @@ def main(args):
             text_tokenizer=test_dataloader.dataset.text_tokenizer,
             label_tokenizer=test_dataloader.dataset.label_tokenizer,
             predict_into_file=predict_into_file,
-            device=args.device,
+            device=accelerator.device,
         )
 
         if args.predict_into_folder is not None:
@@ -353,7 +364,7 @@ def main(args):
             text_tokenizer=test_dataloader.dataset.text_tokenizer,
             label_tokenizer=test_dataloader.dataset.label_tokenizer,
             predict_into_file=predict_into_file,
-            device=args.device,
+            device=accelerator.device,
         )
 
         if predict_into_file is not None:
