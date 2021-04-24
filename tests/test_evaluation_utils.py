@@ -45,8 +45,6 @@ def test_make_test_classes_only_dataloader_integration():
         data,
     ) = tests.utils.default_prepare_dataloaders(
         dataset_frac=1.0,
-        p_extra_classes=0.0,
-        glove_path=None,
     )
 
     tco_dataloader = cat.evaluation_utils.make_test_classes_only_dataloader(

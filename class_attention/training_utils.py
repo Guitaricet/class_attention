@@ -33,6 +33,7 @@ def prepare_dataset(
     return_zero_shot_examples=False,
     class_field=None,
     test_set_name=None,
+    build_class_sets=True,
 ):
     """
 
@@ -51,18 +52,20 @@ def prepare_dataset(
         return_zero_shot_examples: if yes, returns an extra dataset containing zero shot examples,
             NOTE: returns none instead of a dataset if the original dataset does not contain this key
         class_field: name of the class key in the dataset
+        build_class_sets: compute a set of unique test classes and all classes, return them as lists,
+            if False, return None instead
 
     Returns:
-
+        train_dataset, test_dataset, list_all_classes, list_test_classes, (optionaly zero_shot_examples_set)
     """
     if class_field is None:
         raise ValueError("class_field is required")
     if test_set_name is None:
         raise ValueError("test_set_name is required")
 
-    news_dataset = cat.utils.get_dataset_by_name_or_path(dataset_name_or_path)
-    train_set = news_dataset["train"]
-    test_set = news_dataset[test_set_name]
+    dataset_dict = cat.utils.get_dataset_by_name_or_path(dataset_name_or_path)
+    train_set = dataset_dict["train"]
+    test_set = dataset_dict[test_set_name]
 
     if dataset_frac < 1:
         # sample from the train set and the test set
@@ -90,17 +93,19 @@ def prepare_dataset(
         )
 
     if return_zero_shot_examples and test_class_frac == 0:
-        zero_shot_examples_set = news_dataset.get("zero_shot_examples", None)
+        zero_shot_examples_set = dataset_dict.get("zero_shot_examples", None)
 
-    train_classes = set(train_set[class_field])
-    test_classes = set(test_set[class_field])
+    all_classes, zero_shot_classes = [], []
+    if build_class_sets:
+        train_classes = set(train_set[class_field])
+        test_classes = set(test_set[class_field])
 
-    # do not move this code above the IF statement as it may change all_classes
-    all_classes = train_classes | test_classes
-    zero_shot_classes = test_classes.difference(train_classes)
+        # do not move this code above the IF statement as it may change all_classes
+        all_classes = train_classes | test_classes
+        zero_shot_classes = test_classes.difference(train_classes)
 
-    if len(zero_shot_classes) < 2:
-        logger.warning(f"Less than two zero-shot classes in the split: {zero_shot_classes}")
+        if len(zero_shot_classes) < 2:
+            logger.warning(f"Less than two zero-shot classes in the split: {zero_shot_classes}")
 
     if return_zero_shot_examples:
         return (
@@ -121,13 +126,14 @@ def prepare_dataloaders(
     model_name,
     dataset_frac=1.0,
     num_workers=8,
-    glove_path=None,
-    p_extra_classes=0,
     return_zero_shot_examples=False,
     text_field=None,
     class_field=None,
     test_set_name=None,
     p_no_class=0,
+    test_dataset_name_or_path=None,
+    test_text_field=None,
+    test_class_field=None,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -138,8 +144,8 @@ def prepare_dataloaders(
         batch_size: batch size for the dataloadres
         model_name: str, used as AutoTokenizer.from_pretrained(model_name)
         num_workers: number of workers in each dataloader
-        glove_path: path to a GloVe file, these embeddings will be used as a label tokenizer
         return_zero_shot_examples: if True, returns an unlabeled dataset with examples of zero-shot classes
+        test_dataset_name_or_path: load a different dataset to evaluate on ("validation" field is used)
 
     Returns:
         tuple (train_dataloader, test_dataloader, all_classes_str, test_classes_str)
@@ -155,6 +161,12 @@ def prepare_dataloaders(
     if test_set_name is None:
         raise ValueError("test_set_name is required")
 
+    if "wiki" in dataset_name_or_path and test_dataset_name_or_path is None:
+        raise NotImplementedError()
+
+    test_text_field = test_text_field or text_field
+    test_class_field = test_class_field or class_field
+
     (
         reduced_train_set,
         test_set,
@@ -168,31 +180,52 @@ def prepare_dataloaders(
         return_zero_shot_examples=True,
         class_field=class_field,
         test_set_name=test_set_name,
+        build_class_sets=bool(test_dataset_name_or_path is None),  # only
     )
+
+    if test_dataset_name_or_path:
+        _, test_set, all_classes_str, test_classes_str = prepare_dataset(
+            dataset_name_or_path=test_dataset_name_or_path,
+            test_class_frac=test_class_frac,
+            dataset_frac=dataset_frac,
+            class_field=test_class_field,
+            test_set_name=test_set_name,
+            build_class_sets=True,
+        )
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
-
-    if glove_path is not None:
-        _, word2id = cat.utils.load_glove_from_file(glove_path)
-        label_tokenizer = cat.utils.GloVeTokenizer(word2id)
-    else:
-        label_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
+    label_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
 
     # Datasets
-    reduced_train_dataset = cat.CatDataset(
-        texts=reduced_train_set[text_field],
-        text_tokenizer=text_tokenizer,
-        labels=reduced_train_set[class_field],
-        label_tokenizer=label_tokenizer,
-    )
+    if "ids" in text_field:  # means the dataset is preprocessed
+        reduced_train_dataset = cat.PreprocessedCatDatasetWCropAug(
+            text_ids=reduced_train_set[text_field],
+            label_ids=reduced_train_set[class_field],
+            tokenizer=label_tokenizer,
+        )
+
+    else:
+        reduced_train_dataset = cat.CatDataset(
+            texts=reduced_train_set[text_field],
+            text_tokenizer=text_tokenizer,
+            labels=reduced_train_set[class_field],
+            label_tokenizer=label_tokenizer,
+        )
+
+    if "ids" in test_text_field:
+        raise NotImplementedError()
+
     test_dataset = cat.CatDataset(
-        texts=test_set[text_field],
+        texts=test_set[test_text_field],
         text_tokenizer=text_tokenizer,
-        labels=test_set[class_field],
+        labels=test_set[test_class_field],
         label_tokenizer=label_tokenizer,
     )
 
     # Dataloaders
+    if len(all_classes_str) > 100:
+        logger.warning(10 * "More than 100 test classes. Continuing this run is not recommended\n")
+
     all_classes_ids = label_tokenizer.batch_encode_plus(
         all_classes_str,
         return_tensors="pt",
@@ -202,9 +235,6 @@ def prepare_dataloaders(
 
     train_collator = cat.CatCollator(
         pad_token_id=label_tokenizer.pad_token_id,
-        possible_label_ids=all_classes_ids,
-        p_extra_classes=p_extra_classes,
-        p_no_class=p_no_class,
     )
     test_collator = cat.CatTestCollator(
         possible_labels_ids=all_classes_ids, pad_token_id=label_tokenizer.pad_token_id
@@ -537,14 +567,6 @@ def validate_dataloader(dataloader: DataLoader, test_classes, is_test=False):
         assert set(dataset.labels).issuperset(set(test_classes))
     else:
         assert set(dataset.labels).isdisjoint(set(test_classes))
-
-
-def make_label_encoder(model_name_or_path, glove=None):
-    if glove is not None:
-        emb_matrix, word2id = cat.utils.load_glove_from_file(glove)
-        return cat.modelling.PreTrainedEmbeddingEncoder(emb_matrix, word2id)
-
-    return transformers.AutoModel.from_pretrained(model_name_or_path)
 
 
 def get_extra_examples_neg_entropy(extra_examples_dataloader, model, device):

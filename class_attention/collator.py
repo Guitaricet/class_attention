@@ -10,19 +10,11 @@ class CatCollator:
 
     Args:
         pad_token_id: paddng token id used for BOTH texts and classes
-        p_extra_classes: 0 <= float <= 1, if 0 no class names are added to the ones in the batch;
-            if 1 then all possible_labels_ids are used in each batch
         possible_label_ids: torch.LongTensor[n_labels, label_len], a matrix of padded label ids;
             required if p_extra_classes is specified
-        p_no_class: 0 <= float < 1, proportion of data without true label
     """
 
-    def __init__(self, pad_token_id, possible_label_ids=None, p_extra_classes=0, p_no_class=0):
-        if not 0 <= p_extra_classes <= 1:
-            raise ValueError(p_extra_classes)
-
-        if p_extra_classes > 0 and possible_label_ids is None:
-            raise ValueError("if p_extra_classes > 0 possible_labels_ids should be specified")
+    def __init__(self, pad_token_id, possible_label_ids=None):
 
         if possible_label_ids is not None:
             if torch.unique(possible_label_ids, dim=0).size() != possible_label_ids.size():
@@ -30,8 +22,6 @@ class CatCollator:
 
         self.pad_token_id = pad_token_id
         self.possible_label_ids = possible_label_ids
-        self.p_extra_classes = p_extra_classes
-        self.p_no_class = p_no_class
 
         if self.possible_label_ids is not None:
             self._max_label_len = max(len(label) for label in self.possible_label_ids)
@@ -69,9 +59,6 @@ class CatCollator:
         max_text_len = max(len(text) for text, label in examples)
         max_label_len = max(len(label) for text, label in examples)
 
-        if self.p_extra_classes > 0:
-            max_label_len = self._max_label_len
-
         device = examples[0][0].device
 
         # we construct this tensor only to use it in the torch.unique operation, we do not return it
@@ -101,27 +88,6 @@ class CatCollator:
         # Q: can/should we shuffle the targets and unique_labels here?
         # A: no, because the dataloader shuffles for us
 
-        if self.p_no_class > 0:
-            unique_labels, targets = self._remove_p_random_classes(unique_labels, targets, device)
-
-        if self.p_extra_classes > 0:
-            unique_labels, targets = self._add_p_random_classes(
-                unique_labels, targets, device, original_unique_labels, _pre_batch_y
-            )
-
-        # hack to guarantee that we have enough classes to at least non-trivially forward the model
-        if unique_labels.shape[0] < 2:
-            if unique_labels.shape[1] != self._max_label_len:
-                tmp = torch.zeros(unique_labels.shape[0], self._max_label_len, dtype=torch.int64)
-                tmp[:, : unique_labels.shape[1]] = unique_labels
-                unique_labels = tmp
-
-            additional_labels = get_difference(self.possible_label_ids, unique_labels)
-
-            ids = torch.randperm(additional_labels.shape[0], device=additional_labels.device)
-            two_random_additional_labels = additional_labels[ids]
-            unique_labels = torch.cat([unique_labels, two_random_additional_labels])
-
         return batch_x, unique_labels, targets
 
     def _call_without_labels(self, examples):
@@ -140,77 +106,6 @@ class CatCollator:
             batch_x[i, : len(text)] = text
 
         return batch_x, self.possible_label_ids
-
-    def _remove_p_random_classes(self, unique_labels, targets, device):
-        leave_label_mask = (
-            torch.rand(unique_labels.size(0), device=unique_labels.device) > self.p_no_class
-        )
-
-        return self._remove_classes_by_mask(leave_label_mask, unique_labels, targets, device)
-
-    @staticmethod
-    def _remove_classes_by_mask(leave_class_mask, unique_labels, targets, device):
-        """Note that in leave_class_mask 1 means to leave a class and 0 means to remove it"""
-        if len(leave_class_mask.shape) != 1:
-            raise ValueError(leave_class_mask)
-        if len(unique_labels.shape) != 2:
-            raise ValueError(unique_labels)
-        if len(targets.shape) != 1:
-            raise ValueError(targets)
-        original_targets_shape = targets.shape
-
-        # a little optimization
-        if leave_class_mask.sum() == leave_class_mask.size(0):
-            return unique_labels, targets
-
-        remained_labels = unique_labels[leave_class_mask]
-        # TODO: this is potentially very slow
-        # you can speed it up by using the fact that .unique sorts rows
-        for i, t in enumerate(targets):
-            _label = unique_labels[t]
-            new_index = get_index(remained_labels, _label.unsqueeze(0))
-
-            if len(new_index) == 1:
-                targets[i] = new_index.squeeze()
-            elif len(new_index) == 0:
-                targets[i] = torch.tensor(-1).to(device)
-            else:
-                raise ValueError(new_index)
-
-        assert targets.shape == original_targets_shape
-        return remained_labels, targets
-
-    def _add_p_random_classes(
-        self, unique_labels, targets, device, original_unique_labels, _pre_batch_y
-    ):
-        """
-        We sample only from the labels absent from the original unique_labels.
-        Note that unique labels may be smaller than the original unique labels,
-        because we may have applied _remove_p_random_classes to it.
-        """
-        _possible_lids = get_difference(self.possible_label_ids, original_unique_labels)
-        if _possible_lids.size(0) == 0:
-            return unique_labels, targets
-
-        extra_labels_mask = (
-            torch.rand(_possible_lids.size(0), device=_possible_lids.device) < self.p_extra_classes
-        )
-
-        # a little optimization
-        if extra_labels_mask.sum() == 0:
-            return unique_labels, targets
-
-        extra_labels = _possible_lids[extra_labels_mask]
-        unique_labels = torch.cat([unique_labels, extra_labels], dim=0).unique(dim=0)
-
-        no_class_mask = targets == torch.tensor(-1).to(device)
-        default_index = torch.tensor(-1, device=device, dtype=torch.int64)
-        targets = get_index_with_default_index(unique_labels, _pre_batch_y, default_index=default_index)
-        assert targets.size(0) == _pre_batch_y.size(0)
-
-        targets[no_class_mask] = torch.tensor(-1).to(device)
-
-        return unique_labels, targets
 
 
 class CatTestCollator:

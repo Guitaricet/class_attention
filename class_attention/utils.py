@@ -24,45 +24,6 @@ logging.basicConfig(
 logger = logging.getLogger(os.path.basename(__file__))
 
 
-class GloVeTokenizer:
-    """Pretends a Transformers.Tokenizer, used for GloVe embeddings"""
-
-    def __init__(self, word2id, pad_token_id=0):
-        # tokenizer.pad_token_id -> int, should be the same as text_tokenizer.pad_token_id
-        if pad_token_id != 0:
-            raise ValueError("GloVeTokenizer only supports pad_token_id=0")
-
-        self.word2id = word2id
-        self.pad_token_id = int(pad_token_id)
-
-    def encode(self, text, **kwargs):
-        # tokenizer.encode -> numpy tensor of shape [seq_len,]
-        text = text.lower()
-
-        # NOTE: hardcoded tokenization
-        if "worldpost" not in self.word2id:
-            text = re.sub("worldpost", "world post", text)
-
-        tokens = text.split(" ")  # good enough for class names
-        ids = [self.word2id[t] for t in tokens]
-        return np.array(ids)
-
-    def batch_encode_plus(self, texts, **kwargs):
-        # tokenizer.batch_encode_plus -> returns an object with "input_ids" key that contains a Tensor
-        if not isinstance(texts, list):
-            raise ValueError(texts)
-
-        batch = [self.encode(t) for t in texts]
-        batch_size = len(batch)
-        max_len = max(map(len, batch))
-
-        batch_pt = torch.ones(batch_size, max_len, dtype=torch.int64) * self.pad_token_id
-        for i, example in enumerate(batch):
-            batch_pt[i, : len(example)] = torch.LongTensor(example)
-
-        return {"input_ids": batch_pt}
-
-
 def make_whitespace_tokenizer(texts, max_vocab_size=10_000, unk_token="[UNK]", pad_token="[PAD]"):
     """
     Creates a simple tokenizer that splits a lowercased string into words via whitespace.
@@ -211,40 +172,6 @@ def get_dataset_by_name_or_path(name_or_path):
     return dataset
 
 
-def load_glove_from_file(path):
-    word_list = []
-    embeddings = []
-
-    with open(path) as f:
-        for line in f:
-            if not line:
-                continue
-
-            word, vector = line.split(" ", 1)
-            vector = np.array(list(map(float, vector.split(" "))))
-
-            word_list.append(word)
-            embeddings.append(vector)
-
-    if len(word_list) == 0:
-        raise ValueError(f"Received an empty file via path {path}")
-
-    emb_dim = embeddings[0].size
-    # add padding vector
-    embeddings = [np.zeros(emb_dim)] + embeddings
-
-    embedding_matrix = np.array(embeddings)
-
-    assert len(set(word_list)) == len(word_list)
-    word2id = {w: i for i, w in enumerate(word_list, start=1)}
-    assert "[PAD]" not in word2id
-    word2id["[PAD]"] = 0
-
-    assert len(word2id) == embedding_matrix.shape[0]
-
-    return embedding_matrix, word2id
-
-
 def infinite_iterator(iterable):
     if isinstance(iterable, torch.utils.data.DataLoader):
         if not isinstance(iterable.sampler, torch.utils.data.sampler.RandomSampler):
@@ -253,14 +180,6 @@ def infinite_iterator(iterable):
     while True:
         for x in iter(iterable):
             yield x
-
-
-def extract_words_from_glove(glove_path):
-    with open(glove_path) as f:
-        words = [line.strip().split(" ", 1)[0] for line in f]
-
-    filtered_words = filter_words(words)
-    return filtered_words
 
 
 def filter_words(words, extra_filter=None):

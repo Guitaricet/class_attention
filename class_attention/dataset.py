@@ -88,3 +88,57 @@ class CatDataset(torch.utils.data.Dataset):
 
         ids_torch = torch.LongTensor(ids_numpy)
         return ids_torch
+
+
+class PreprocessedCatDatasetWCropAug(torch.utils.data.Dataset):
+    """
+    Assumes that the text and labels are tokenized into text_ids and label_ids.
+    If the text/label is larger than max_text_len, then a random crop is performed.
+
+    Every text_id and label_id should start and end with special tokens (e.g., CLS and SEP),
+    these tokens are not affected by random crop.
+
+    This class is motivated by the wikipedia dataset.
+    It is very large in terms of the number of examples (motivates prefetching)
+    and in terms of text length (requires cropping, random cropping is chosen).
+    """
+
+    def __init__(self, text_ids, label_ids, tokenizer, max_text_len=512):
+        self.text_ids = text_ids
+        self.label_ids = label_ids
+        self.text_tokenizer = tokenizer
+        self.label_tokenizer = tokenizer
+        self.max_text_len = max_text_len
+
+    def __len__(self):
+        return len(self.text_ids)
+
+    def __getitem__(self, idx):
+        text_ids = torch.tensor(self.text_ids[idx])
+        label_ids = torch.tensor(self.label_ids[idx])
+
+        text_ids = self.maybe_crop(text_ids)
+        label_ids = self.maybe_crop(label_ids)
+
+        return text_ids, label_ids
+
+    def maybe_crop(self, text_ids):
+        assert len(text_ids.shape) == 1
+        if len(text_ids) <= self.max_text_len:
+            return text_ids
+
+        # minus CLS and SEP tokens
+        delta = len(text_ids) - self.max_text_len
+
+        # torch.randint includes start=1 but excludes end=delta + 1
+        random_start = torch.randint(0, delta + 1, size=(1,))[0]
+        end = random_start + self.max_text_len - 2
+
+        cropped_sequence = torch.cat(
+            [
+                text_ids[0].unsqueeze(0),  # CLS
+                text_ids[1 + random_start: 1 + end],
+                text_ids[-1].unsqueeze(0),  # SEP
+            ]
+        )
+        return cropped_sequence

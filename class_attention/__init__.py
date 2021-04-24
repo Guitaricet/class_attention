@@ -1,5 +1,5 @@
 from class_attention.collator import CatCollator, CatTestCollator
-from class_attention.dataset import CatDataset
+from class_attention.dataset import CatDataset, PreprocessedCatDatasetWCropAug
 from class_attention.modelling_class_attention import ClassAttentionModel
 
 import class_attention.utils

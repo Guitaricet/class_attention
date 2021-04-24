@@ -34,12 +34,18 @@ def parse_args(args=None):
     # data
     parser.add_argument("--dataset", default=DATASET,
                         help="Name or path to a HuggingFace Datasets dataset")
+    parser.add_argument("--test-dataset", default=None,
+                        help="A dataset to evaluate on (--evaluate_on field), if not specified --dataset is used. "
+                             "Use this option if you pretrain on a ranking task (wiki) and evaluate on a "
+                             "classification task (news-category/0shot-tc)")
     parser.add_argument("--test-class-frac", default=0.0, type=float,
                         help="a fraction of classes to remove from the training set (and use for zero-shot)")
     parser.add_argument("--dataset-frac", default=1.0, type=float,
                         help="a fraction of dataset to train and evaluate on, used for debugging")
     parser.add_argument("--text-field", default=None, type=str)
     parser.add_argument("--class-field", default=None, type=str)
+    parser.add_argument("--test-set-text-field", default=None, type=str)
+    parser.add_argument("--test-set-class-field", default=None, type=str)
 
     # architecture
     parser.add_argument("--model", default=MODEL, type=str)
@@ -52,8 +58,6 @@ def parse_args(args=None):
                         help="softmax temperature (used as the initial value if --learn-temperature")
     parser.add_argument("--learn-temperature", default=False, action="store_true",
                         help="learn the softmax temperature as an additional scalar parameter")
-    parser.add_argument("--remove-n-lowest-pc", default=0, type=int,
-                        help="remove n lowest principal components from the class embeddings")
     parser.add_argument("--representation-layer", default=-1, type=int,
                         help="hidden layer representations to use for the text and class representations."
                              "The last layer is used by default (-1). 0 means the first layer.")
@@ -69,8 +73,6 @@ def parse_args(args=None):
 
     parser.add_argument("--no-bias", default=False, action="store_true",
                         help="do not use bias in added layers")
-    parser.add_argument("--glove", default=None, type=str,
-                        help="path to GloVe embeddings. Use them instead of transformer for class encoding.")
     parser.add_argument("--random-cls-vectors", default=False, action="store_true",
                         help="use random vectors as class vectors (aka untrained word2vec), "
                              "vector size equals to --hidden-size, used as a sanity check / baseline.")
@@ -97,21 +99,11 @@ def parse_args(args=None):
 
     # --- Regularization
     # Extra classes and entropy reg
-    parser.add_argument("--p-extra-classes", default=0, type=float,
-                        help="proportion of extra classes to feed into the model during of training at every batch. "
-                             "Set to 1 to use all training classes in every batch.")
-    parser.add_argument("--p-no-class", default=0, type=float,
-                        help="proportion of labels to randomly drop in the batch")
-    parser.add_argument("--examples-entropy-reg", default=None, type=float,
-                        help="maximize the entropy of the predicted distribution on unknown **examples**")
     parser.add_argument("--extra-classes-file", default=None, type=str,
                         help="path to a text file with extra class names (one name on every line), "
                              "used for adversarial regularization")
     parser.add_argument("--extra-classes-batch-size", default=None, type=int,
                         help="the number of extra classes to compute the regularization term")
-    parser.add_argument("--regularize-with-real-classes", default=False, action="store_true",
-                        help="use real zero-shot classes to maximize the entropy of P(Zero|x_Multi). "
-                             "Not practical, serves as oracle/sanity check.")
 
     # Adversarial
     parser.add_argument("--discriminator-update-freq", default=None, type=int)
@@ -175,6 +167,11 @@ def parse_args(args=None):
         args.wasserstein = bool(int(args.wasserstein_for_sweeps))
         args.wasserstein_for_sweeps = None
 
+    if args.test_dataset is not None:
+        logger.info(
+            f"Evaluation will be performed on the {args.evaluate_on} field of {args.test_dataset} dataset."
+        )
+
     return args
 
 
@@ -186,13 +183,12 @@ def main(args):
     args.class_field = class_field
 
     accelerator = Accelerator(fp16=args.fp16)
-    args.accelerator_device = accelerator.device
 
     wandb.init(project="class_attention", config=args, tags=args.tags, name=args.wandb_name)
     logger.info(f"Starting the script with the arguments \n{json.dumps(vars(args), indent=4)}")
 
     logger.info("Creating dataloaders")
-    # TODO: use validation dataset as an unlabeled data source
+
     (
         train_dataloader,
         test_dataloader,
@@ -206,14 +202,14 @@ def main(args):
         test_class_frac=args.test_class_frac,
         dataset_frac=args.dataset_frac,
         batch_size=args.batch_size,
-        p_no_class=args.p_no_class,
-        p_extra_classes=args.p_extra_classes,
         num_workers=args.n_workers,
         return_zero_shot_examples=True,
-        glove_path=args.glove,
         text_field=text_field,
         class_field=class_field,
         test_set_name=args.evaluate_on,
+        test_dataset_name_or_path=args.test_dataset,
+        test_text_field=text_field,
+        test_class_field=class_field,
     )
 
     wandb.config.update(
@@ -236,9 +232,7 @@ def main(args):
         label_encoder = cat.modelling_utils.get_small_transformer()
     else:
         text_encoder = transformers.AutoModel.from_pretrained(args.model)
-        label_encoder = cat.training_utils.make_label_encoder(
-            model_name_or_path=args.model, glove=args.glove
-        )
+        label_encoder = transformers.AutoModel.from_pretrained(args.model)
 
     if args.random_cls_vectors:
         label_encoder = cat.modelling_utils.get_small_transformer(hidden_size=args.hidden_size)
@@ -284,9 +278,6 @@ def main(args):
         predict_into_file = os.path.join(args.predict_into_folder, "predictions_all_classes.txt")
 
     extra_kwargs = dict()
-    if args.examples_entropy_reg:
-        extra_kwargs["extra_examples_dataloader"] = zero_shot_dataloader
-        extra_kwargs["examples_entropy_reg"] = args.examples_entropy_reg
     if args.extra_classes_file:
         # fmt: off
         extra_kwargs["extra_classes_dataloader"] = cat.training_utils.make_extra_classes_dataloader_from_file(
