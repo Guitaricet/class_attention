@@ -210,6 +210,7 @@ def main(args):
         test_dataset_name_or_path=args.test_dataset,
         test_text_field=text_field,
         test_class_field=class_field,
+        verbose=True,
     )
 
     wandb.config.update(

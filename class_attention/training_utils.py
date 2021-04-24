@@ -130,10 +130,10 @@ def prepare_dataloaders(
     text_field=None,
     class_field=None,
     test_set_name=None,
-    p_no_class=0,
     test_dataset_name_or_path=None,
     test_text_field=None,
     test_class_field=None,
+    verbose=False,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -167,6 +167,9 @@ def prepare_dataloaders(
     test_text_field = test_text_field or text_field
     test_class_field = test_class_field or class_field
 
+    if verbose:
+        logger.info("Preparing training set")
+
     (
         reduced_train_set,
         test_set,
@@ -184,6 +187,9 @@ def prepare_dataloaders(
     )
 
     if test_dataset_name_or_path:
+        if verbose:
+            logger.info("Preparing test set")
+
         _, test_set, all_classes_str, test_classes_str = prepare_dataset(
             dataset_name_or_path=test_dataset_name_or_path,
             test_class_frac=test_class_frac,
@@ -198,6 +204,9 @@ def prepare_dataloaders(
 
     # Datasets
     if "ids" in text_field:  # means the dataset is preprocessed
+        if verbose:
+            logger.info("The training dataset is preprocessed, creating PreprocessedCatDatasetWCropAug object")
+
         reduced_train_dataset = cat.PreprocessedCatDatasetWCropAug(
             text_ids=reduced_train_set[text_field],
             label_ids=reduced_train_set[class_field],
@@ -205,6 +214,9 @@ def prepare_dataloaders(
         )
 
     else:
+        if verbose:
+            logger.info("The training dataset is raw text, creating CatDataset object")
+
         reduced_train_dataset = cat.CatDataset(
             texts=reduced_train_set[text_field],
             text_tokenizer=text_tokenizer,
@@ -214,6 +226,9 @@ def prepare_dataloaders(
 
     if "ids" in test_text_field:
         raise NotImplementedError()
+
+    if verbose:
+        logger.info("Creating CatDataset object for the test set")
 
     test_dataset = cat.CatDataset(
         texts=test_set[test_text_field],
@@ -226,12 +241,18 @@ def prepare_dataloaders(
     if len(all_classes_str) > 100:
         logger.warning(10 * "More than 100 test classes. Continuing this run is not recommended\n")
 
+    if verbose:
+        logger.info("Encoding test classes")
+
     all_classes_ids = label_tokenizer.batch_encode_plus(
         all_classes_str,
         return_tensors="pt",
         add_special_tokens=True,
         padding=True,
     )["input_ids"]
+
+    if verbose:
+        logger.info("Building dataloaders")
 
     train_collator = cat.CatCollator(
         pad_token_id=label_tokenizer.pad_token_id,
