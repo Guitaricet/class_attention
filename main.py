@@ -44,8 +44,8 @@ def parse_args(args=None):
                         help="a fraction of dataset to train and evaluate on, used for debugging")
     parser.add_argument("--text-field", default=None, type=str)
     parser.add_argument("--class-field", default=None, type=str)
-    parser.add_argument("--test-set-text-field", default=None, type=str)
-    parser.add_argument("--test-set-class-field", default=None, type=str)
+    parser.add_argument("--test-text-field", default=None, type=str)
+    parser.add_argument("--test-class-field", default=None, type=str)
 
     # architecture
     parser.add_argument("--model", default=MODEL, type=str)
@@ -167,21 +167,23 @@ def parse_args(args=None):
         args.wasserstein = bool(int(args.wasserstein_for_sweeps))
         args.wasserstein_for_sweeps = None
 
-    if args.test_dataset is not None:
-        logger.info(
-            f"Evaluation will be performed on the {args.evaluate_on} field of {args.test_dataset} dataset."
-        )
-
-    return args
-
-
-def main(args):
     text_field, class_field = cat.utils.infer_field_names(
         args.dataset, text_field=args.text_field, class_field=args.class_field
     )
     args.text_field = text_field
     args.class_field = class_field
 
+    if args.test_dataset is not None:
+        logger.info(
+            f"Evaluation will be performed on the {args.evaluate_on} field of {args.test_dataset} dataset."
+        )
+        args.test_text_field = args.test_text_field or args.text_field
+        args.test_class_field = args.test_class_field or args.class_field
+
+    return args
+
+
+def main(args):
     accelerator = Accelerator(fp16=args.fp16)
 
     wandb.init(project="class_attention", config=args, tags=args.tags, name=args.wandb_name)
@@ -204,12 +206,12 @@ def main(args):
         batch_size=args.batch_size,
         num_workers=args.n_workers,
         return_zero_shot_examples=True,
-        text_field=text_field,
-        class_field=class_field,
+        text_field=args.text_field,
+        class_field=args.class_field,
         test_set_name=args.evaluate_on,
         test_dataset_name_or_path=args.test_dataset,
-        test_text_field=text_field,
-        test_class_field=class_field,
+        test_text_field=args.test_text_field,
+        test_class_field=args.test_class_field,
         verbose=True,
     )
 
@@ -261,7 +263,6 @@ def main(args):
             output_size=1,
             spectral_normalization=True,
         )
-        # hparams from https://arxiv.org/abs/1704.00028
         discriminator_optimizer = torch.optim.Adam(
             discriminator.parameters(), lr=args.discr_lr, betas=(0.0, 0.9)
         )
