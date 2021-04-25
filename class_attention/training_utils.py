@@ -34,6 +34,7 @@ def prepare_dataset(
     class_field=None,
     test_set_name=None,
     build_class_sets=True,
+    verbose=False,
 ):
     """
 
@@ -63,14 +64,28 @@ def prepare_dataset(
     if test_set_name is None:
         raise ValueError("test_set_name is required")
 
+    if verbose:
+        logger.info("Loading dataset into memory")
+
     dataset_dict = cat.utils.get_dataset_by_name_or_path(dataset_name_or_path)
+
+    if verbose:
+        logger.info("The dataset is loaded")
+
     train_set = dataset_dict["train"]
     test_set = dataset_dict[test_set_name]
 
     if dataset_frac < 1:
+        if verbose:
+            logger.info("Sampling from the dataset")
+
         # sample from the train set and the test set
         train_set = cat.utils.sample_dataset(train_set, p=dataset_frac)
         test_set = cat.utils.sample_dataset(test_set, p=dataset_frac)
+
+        if "wiki" in dataset_name_or_path:
+            logger.warning("Sampling from a Wikipedia dataset may take a long time (~10+ minutes). "
+                           "Consider pre-sampling and saving it as a different file to speed up the experiments.")
 
         _train_classes = set(train_set[class_field])
         _test_classes = set(test_set[class_field])
@@ -88,6 +103,9 @@ def prepare_dataset(
 
     zero_shot_examples_set = None
     if test_class_frac > 0.0:
+        if verbose:
+            logger.info("Creating test classes")
+
         train_set, zero_shot_examples_set = cat.utils.split_classes(
             train_set, class_field=class_field, p_test_classes=test_class_frac, verbose=True
         )
@@ -97,6 +115,9 @@ def prepare_dataset(
 
     all_classes, zero_shot_classes = [], []
     if build_class_sets:
+        if verbose:
+            logger.info("Building class sets")
+
         train_classes = set(train_set[class_field])
         test_classes = set(test_set[class_field])
 
@@ -184,6 +205,7 @@ def prepare_dataloaders(
         class_field=class_field,
         test_set_name=test_set_name,
         build_class_sets=bool(test_dataset_name_or_path is None),  # only
+        verbose=True,
     )
 
     if test_dataset_name_or_path:
