@@ -219,6 +219,7 @@ def prepare_dataloaders(
             class_field=test_class_field,
             test_set_name=test_set_name,
             build_class_sets=True,
+            verbose=True,
         )
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
