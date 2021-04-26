@@ -198,8 +198,6 @@ def evaluate_model_on_subset(
         class_field=class_field,
     )
 
-    assert set(test_dataloader.dataset.labels) == set(test_classes_str)
-
     subset_metrics = evaluate_model(
         model,
         test_dataloader,

@@ -223,7 +223,7 @@ def prepare_dataloaders(
         )
 
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
-    label_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
+    label_tokenizer = text_tokenizer  # legacy stuff
 
     # Datasets
     if "ids" in text_field:  # means the dataset is preprocessed
@@ -231,9 +231,10 @@ def prepare_dataloaders(
             logger.info("The training dataset is preprocessed, creating PreprocessedCatDatasetWCropAug object")
 
         reduced_train_dataset = cat.PreprocessedCatDatasetWCropAug(
-            text_ids=reduced_train_set[text_field],
-            label_ids=reduced_train_set[class_field],
-            tokenizer=label_tokenizer,
+            dataset=reduced_train_set,
+            text_field=text_field,
+            class_field=class_field,
+            tokenizer=text_tokenizer,
         )
 
     else:
@@ -605,12 +606,13 @@ def validate_dataloader(dataloader: DataLoader, test_classes, is_test=False):
     else:
         assert isinstance(dataloader.sampler, torch.utils.data.sampler.RandomSampler)
 
-    dataset: cat.CatDataset = dataloader.dataset
+    if isinstance(dataloader.dataset, cat.CatDataset):
+        dataset: cat.CatDataset = dataloader.dataset
 
-    if is_test:
-        assert set(dataset.labels).issuperset(set(test_classes))
-    else:
-        assert set(dataset.labels).isdisjoint(set(test_classes))
+        if is_test:
+            assert set(dataset.labels).issuperset(set(test_classes))
+        else:
+            assert set(dataset.labels).isdisjoint(set(test_classes))
 
 
 def get_extra_examples_neg_entropy(extra_examples_dataloader, model, device):

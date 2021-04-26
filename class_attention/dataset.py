@@ -101,21 +101,30 @@ class PreprocessedCatDatasetWCropAug(torch.utils.data.Dataset):
     This class is motivated by the wikipedia dataset.
     It is very large in terms of the number of examples (motivates prefetching)
     and in terms of text length (requires cropping, random cropping is chosen).
+
+    Args:
+        dataset: datasets.ArrowDataset
+        text_field: name of the text key in the dataset
+        class_field: name of the class key in the dataset
     """
 
-    def __init__(self, text_ids, label_ids, tokenizer, max_text_len=512):
-        self.text_ids = text_ids
-        self.label_ids = label_ids
+    def __init__(self, dataset, text_field, class_field, tokenizer, max_text_len=512):
+        self.dataset = dataset
+        self.text_field = text_field
+        self.class_field = class_field
+
         self.text_tokenizer = tokenizer
         self.label_tokenizer = tokenizer
         self.max_text_len = max_text_len
 
     def __len__(self):
-        return len(self.text_ids)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-        text_ids = torch.tensor(self.text_ids[idx])
-        label_ids = torch.tensor(self.label_ids[idx])
+        item = self.dataset[idx]
+
+        text_ids = torch.tensor(item[self.text_field])
+        label_ids = torch.tensor(item[self.class_field])
 
         text_ids = self.maybe_crop(text_ids)
         label_ids = self.maybe_crop(label_ids)
