@@ -65,7 +65,7 @@ def prepare_dataset(
         raise ValueError("test_set_name is required")
 
     if verbose:
-        logger.info("Loading dataset into memory")
+        logger.info(f"Loading dataset {dataset_name_or_path} into memory")
 
     dataset_dict = cat.utils.get_dataset_by_name_or_path(dataset_name_or_path)
 
