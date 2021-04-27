@@ -46,6 +46,7 @@ def parse_args(args=None):
     parser.add_argument("--class-field", default=None, type=str)
     parser.add_argument("--test-text-field", default=None, type=str)
     parser.add_argument("--test-class-field", default=None, type=str)
+    parser.add_argument("--max-text-length", default=512, type=int)
 
     # architecture
     parser.add_argument("--model", default=MODEL, type=str)
@@ -212,6 +213,7 @@ def main(args):
         test_dataset_name_or_path=args.test_dataset,
         test_text_field=args.test_text_field,
         test_class_field=args.test_class_field,
+        max_text_length=args.max_text_length,
         verbose=True,
     )
 
@@ -228,7 +230,7 @@ def main(args):
         logger.warning(f"Less than two zero-shot classes")
 
     # Model
-    logger.info("Creating model and optimizer")
+    logger.info("Loading pretrained models")
 
     if args.debug:
         text_encoder = cat.modelling_utils.get_small_transformer()

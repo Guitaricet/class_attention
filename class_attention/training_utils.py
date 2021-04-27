@@ -155,6 +155,7 @@ def prepare_dataloaders(
     test_text_field=None,
     test_class_field=None,
     verbose=False,
+    max_text_length=512,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -235,6 +236,7 @@ def prepare_dataloaders(
             text_field=text_field,
             class_field=class_field,
             tokenizer=text_tokenizer,
+            max_text_len=max_text_length,
         )
 
     else:
@@ -246,6 +248,7 @@ def prepare_dataloaders(
             text_tokenizer=text_tokenizer,
             labels=reduced_train_set[class_field],
             label_tokenizer=label_tokenizer,
+            max_text_len=max_text_length,
         )
 
     if "ids" in test_text_field:
@@ -259,6 +262,7 @@ def prepare_dataloaders(
         text_tokenizer=text_tokenizer,
         labels=test_set[test_class_field],
         label_tokenizer=label_tokenizer,
+        max_text_len=max_text_length,
     )
 
     # Dataloaders
