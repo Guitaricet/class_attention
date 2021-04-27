@@ -221,7 +221,7 @@ def get_index(host, target):
     assert host.shape[1] == target.shape[1]
     diff = target.unsqueeze(1) - host.unsqueeze(0)
     dsum = torch.abs(diff).sum(-1)
-    loc = torch.nonzero(dsum == 0)
+    loc = torch.nonzero(dsum <= 1e-7)
     return loc[:, -1]
 
 
