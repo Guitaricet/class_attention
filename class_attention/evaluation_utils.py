@@ -42,7 +42,7 @@ def evaluate_model(
         dataloader: pytorch DataLoader with CatTestCollator
         labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_label_ids
         zeroshot_labels: if provided, additional metrics will be computed on this set of labels
-        ranking_dataloader: if provided, precision@k is computed on this one,
+        ranking_dataloader: if provided, recall@k is computed on this one,
             can consume a lot of time and **memory** for datasets >> 1000 examples
 
     Example output:
@@ -170,7 +170,7 @@ def get_all_embeddings(model, ranking_dataloader):
     return all_text_embs, all_title_embs
 
 
-def precision_at_k(x_embs, y_embs, k=1):
+def recall_at_k(x_embs, y_embs, k=1):
     """we assume that x_embs[i] true label is y_embs[i]
 
     Args:
@@ -201,10 +201,10 @@ def evaluate_ranking_model(model, ranking_dataloader):
 
     all_text_embs, all_title_embs = get_all_embeddings(model, ranking_dataloader)
 
-    precision_at_1 = precision_at_k(all_text_embs, all_title_embs, k=1)
-    precision_at_5 = precision_at_k(all_text_embs, all_title_embs, k=5)
+    recall_at_1 = recall_at_k(all_text_embs, all_title_embs, k=1)
+    recall_at_5 = recall_at_k(all_text_embs, all_title_embs, k=5)
 
-    return {"rank_eval/P@1": precision_at_1, "rank_eval/P@5": precision_at_5}
+    return {"rank_eval/R@1": recall_at_1, "rank_eval/R@5": recall_at_5}
 
 
 def predict(
