@@ -1,5 +1,7 @@
 import torch
 
+from class_attention import utils
+
 
 class CatCollator:
     """
@@ -181,8 +183,8 @@ class CatTestCollator:
             batch_x[i, : len(text)] = text
             _pre_batch_y[i, : len(label)] = label
 
-        targets = get_index(
-            self.possible_labels, _pre_batch_y
+        targets = utils.get_index(
+            unique_tensors=self.possible_labels, instances=_pre_batch_y
         )  # 2nd major difference from CatCollator
 
         if batch_size != targets.shape[0]:
@@ -211,44 +213,3 @@ def _validate_input(examples):
                 f"Wrong number of dimensions in the label tensor. "
                 f"Expected a rank-one tensor, got rank-{len(label_0.shape)} instead"
             )
-
-
-# Utils
-
-
-# source: https://discuss.pytorch.org/t/how-to-get-the-row-index-of-specific-values-in-tensor/28036/7
-def get_index(host, target):
-    assert host.shape[1] == target.shape[1]
-    diff = target.unsqueeze(1) - host.unsqueeze(0)
-    dsum = torch.abs(diff).sum(-1)
-    loc = torch.nonzero(dsum <= 1e-7)
-    return loc[:, -1]
-
-
-def get_index_with_default_index(host, target, default_index):
-    """Slower than get_index, because it uses for-loop,
-    but it works correctly in case a host element is not an element of host"""
-    assert host.shape[1] == target.shape[1]
-    device = target.device
-    default_index = default_index.to(device)
-
-    indices = torch.zeros(target.size(0), device=target.device).long()
-
-    for i, example in enumerate(target):
-        sim = (example == host).all(-1)
-        if any(sim):
-            idx = torch.nonzero(sim)
-        else:
-            idx = default_index
-        indices[i] = idx
-
-    return indices
-
-
-def get_difference(t1, t2):
-    """Compute set difference t1 / t2"""
-    sim_matrix = t1.unsqueeze(1) == t2
-    sim_index = sim_matrix.all(-1).any(-1)
-
-    difference = t1[~sim_index]
-    return difference

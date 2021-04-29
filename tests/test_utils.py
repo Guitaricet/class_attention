@@ -175,3 +175,13 @@ def test_get_rmasp(random_model):
     )
     assert rmasp.item() > 0
     assert rmasp.item() < rmasp_0.item()
+
+
+def test_get_index():
+    for _ in range(10):
+        unique_tensors = torch.unique(torch.randint(0, 1000, size=(97, 7)), dim=0)
+        idx = torch.randint(0, 97, size=(10000,))
+        instances = unique_tensors.index_select(0, idx)
+
+        computed_indices = cat.utils.get_index(unique_tensors=unique_tensors, instances=instances)
+        assert torch.allclose(idx, computed_indices)

@@ -77,31 +77,8 @@ def test_get_difference():
     ])
     # fmt: on
 
-    diff = cat.collator.get_difference(x, y)
+    diff = cat.utils.get_difference(x, y)
     assert torch.all(diff == expected_diff)
 
-    no_diff = cat.collator.get_difference(x, x)
+    no_diff = cat.utils.get_difference(x, x)
     assert no_diff.size(0) == 0
-
-
-def test_get_index_with_default():
-    # fmt: off
-    x = torch.LongTensor([
-        [1, 2],
-        [2, 3],
-        [3, 4],
-    ])
-
-    y = torch.LongTensor([
-        [3, 4],
-        [7, 8],
-        [1, 2],
-        [2, 3],
-        [3, 4]
-    ])
-
-    expected_index = torch.LongTensor([2, -1, 0, 1, 2])
-    # fmt: on
-
-    idx = cat.collator.get_index_with_default_index(x, y, torch.tensor(-1))
-    assert torch.all(idx == expected_index)

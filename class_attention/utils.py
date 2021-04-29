@@ -262,3 +262,21 @@ def get_class_vectors(model, train_classes_str, test_classes_str, label_tokenize
     )
 
     return train_classes_h, test_classes_h
+
+
+# source: https://discuss.pytorch.org/t/how-to-get-the-row-index-of-specific-values-in-tensor/28036/7
+def get_index(unique_tensors, instances):
+    assert unique_tensors.shape[1] == instances.shape[1]
+    diff = instances.unsqueeze(1) - unique_tensors.unsqueeze(0)
+    dsum = torch.abs(diff).sum(-1)
+    loc = torch.nonzero(dsum <= 1e-4)  # -4 because of fp16
+    return loc[:, -1]
+
+
+def get_difference(t1, t2):
+    """Compute set difference t1 / t2"""
+    sim_matrix = t1.unsqueeze(1) == t2
+    sim_index = sim_matrix.all(-1).any(-1)
+
+    difference = t1[~sim_index]
+    return difference
