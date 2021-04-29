@@ -282,6 +282,7 @@ def prepare_dataloaders(
         batch_size=batch_size,
         collate_fn=train_collator,
         num_workers=num_workers,
+        pin_memory=True,
         shuffle=True,
     )
 
