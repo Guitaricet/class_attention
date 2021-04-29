@@ -81,6 +81,7 @@ def parse_args(args=None):
     # --- Training
     parser.add_argument("--max-epochs", default=10, type=int)
     parser.add_argument("--early-stopping", default=None, type=int)
+    parser.add_argument("--early-stopping_metric", default="eval/F1_macro", type=str)
     parser.add_argument("--batch-size", default=32, type=int)
     parser.add_argument("--lr", default=1e-4, type=float)
     parser.add_argument("--dropout", default=0.1, type=float)
@@ -306,6 +307,7 @@ def main(args):
         accelerator=accelerator,
         predict_into_file=predict_into_file,
         early_stopping=args.early_stopping,
+        early_stopping_metric=args.early_stopping_metric,
         save_path=args.save_to,
         eval_every_steps=args.eval_every_steps,
         label_smoothing=args.label_smoothing,

@@ -354,6 +354,7 @@ def train_cat_model(
     accelerator,
     predict_into_file=None,
     early_stopping=None,
+    early_stopping_metric="eval/F1_macro",
     save_path=None,
     extra_examples_dataloader=None,
     examples_entropy_reg=None,
@@ -374,7 +375,7 @@ def train_cat_model(
         discriminator_update_freq = 1  # only to safely use in with the %-operation
 
     patience = 0
-    monitor_name = "eval/F1_macro"
+    monitor_name = early_stopping_metric
     best_monitor = 0
     train_classes_str = sorted(set(all_classes_str).difference(set(test_classes_str)))
 
@@ -412,7 +413,12 @@ def train_cat_model(
     if wandb.run is not None:
         wandb.log(metrics)
 
+    should_stop_early = False
+
     for epoch in tqdm(range(max_epochs), desc="Epochs"):
+        if should_stop_early:
+            break
+
         for x, c, y in train_dataloader:
             if c.shape[0] < 2:
                 logger.warning(f"Number of possible classes is {c.shape[0]}, skipping this batch")
@@ -501,6 +507,29 @@ def train_cat_model(
                 if wandb.run is not None:
                     wandb.log(metrics)
 
+                if global_step > 5 and early_stopping is not None:
+                    monitor = metrics[monitor_name]
+                    if monitor > best_monitor:
+                        patience = 0
+                        best_monitor = monitor
+                        if save_path is not None:
+                            model.save(
+                                file_path=save_path,
+                                optimizer=model_optimizer,
+                                epoch=epoch,
+                                global_step=global_step,
+                                train_classes_str=train_classes_str,
+                                test_classes_str=test_classes_str,
+                            )
+                    else:
+                        patience += 1
+                        if patience > early_stopping:
+                            logger.info(
+                                f"The target metric did not improve over {patience} iterations. Stopping early."
+                            )
+                            should_stop_early = True
+                            break  # break the inner loop, the outer will be stopped via should_stop_early flag
+
         # validation
         metrics = cat.evaluation_utils.evaluate_model(
             model=model,
@@ -544,7 +573,7 @@ def train_cat_model(
                     logger.info(
                         f"The target metric did not improve over {patience} iterations. Stopping early."
                     )
-                    break
+                    break  # break the outer loop, no need to set should_stop_early=True
 
     # Training loop ends
 
