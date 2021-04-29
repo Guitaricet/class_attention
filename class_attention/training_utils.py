@@ -218,6 +218,15 @@ def prepare_dataloaders(
             max_text_len=max_text_length,
         )
 
+        ranking_test_dataset = cat.PreprocessedCatDatasetWCropAug(
+            dataset=ranking_test_set,
+            text_field=text_field,
+            class_field=class_field,
+            tokenizer=text_tokenizer,
+            max_text_len=max_text_length,
+            no_augmentations=True,
+        )
+
     else:
         if verbose:
             logger.info("The training dataset is raw text, creating CatDataset object")
@@ -290,7 +299,7 @@ def prepare_dataloaders(
         # and requires to know all possible classes in advance
         # which is not realistic in ranking setting
         ranking_test_dataloader = DataLoader(
-            ranking_test_set,
+            ranking_test_dataset,
             batch_size=batch_size,
             collate_fn=train_collator,
             num_workers=num_workers,

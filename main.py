@@ -254,6 +254,9 @@ def main(args):
         model, optimizer, train_dataloader, test_dataloader
     )
 
+    if ranking_test_dataloader is not None:
+        ranking_test_dataloader = accelerator.prepare_data_loader(ranking_test_dataloader)
+
     discriminator = None
     discriminator_optimizer = None
     if args.discriminator_update_freq is not None:

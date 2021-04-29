@@ -108,7 +108,7 @@ class PreprocessedCatDatasetWCropAug(torch.utils.data.Dataset):
         class_field: name of the class key in the dataset
     """
 
-    def __init__(self, dataset, text_field, class_field, tokenizer, max_text_len=512):
+    def __init__(self, dataset, text_field, class_field, tokenizer, max_text_len=512, no_augmentations=False):
         self.dataset = dataset
         self.text_field = text_field
         self.class_field = class_field
@@ -116,6 +116,7 @@ class PreprocessedCatDatasetWCropAug(torch.utils.data.Dataset):
         self.text_tokenizer = tokenizer
         self.label_tokenizer = tokenizer
         self.max_text_len = max_text_len
+        self.no_augmentations = no_augmentations
 
     def __len__(self):
         return len(self.dataset)
@@ -139,9 +140,13 @@ class PreprocessedCatDatasetWCropAug(torch.utils.data.Dataset):
         # minus CLS and SEP tokens
         delta = len(text_ids) - self.max_text_len
 
-        # torch.randint includes start=1 but excludes end=delta + 1
-        random_start = torch.randint(0, delta + 1, size=(1,))[0]
-        end = random_start + self.max_text_len - 2
+        if self.no_augmentations:
+            random_start = torch.tensor(0, dtype=torch.int64)
+            end = random_start + self.max_text_len - 2
+        else:
+            # torch.randint includes start=1 but excludes end=delta + 1
+            random_start = torch.randint(0, delta + 1, size=(1,))[0]
+            end = random_start + self.max_text_len - 2
 
         cropped_sequence = torch.cat(
             [
