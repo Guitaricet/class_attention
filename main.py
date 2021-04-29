@@ -198,7 +198,7 @@ def main(args):
         all_classes_str,
         test_classes_str,
         data,
-        zero_shot_dataloader,  # only examples, no labels (but all examples belong to the test classes set)
+        ranking_test_dataloader,
     ) = cat.training_utils.prepare_dataloaders(
         dataset_name_or_path=args.dataset,
         model_name=args.model,
@@ -206,7 +206,6 @@ def main(args):
         dataset_frac=args.dataset_frac,
         batch_size=args.batch_size,
         num_workers=args.n_workers,
-        return_zero_shot_examples=True,
         text_field=args.text_field,
         class_field=args.class_field,
         test_set_name=args.evaluate_on,
@@ -313,6 +312,7 @@ def main(args):
         class_cos2_reg=args.class_cos2_reg,
         adv_reg_weight=args.adv_reg_weight,
         use_wasserstein_loss=args.wasserstein,
+        ranking_test_dataloader=ranking_test_dataloader,
         **extra_kwargs,
     )
 

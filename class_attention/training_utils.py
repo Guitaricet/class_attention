@@ -30,7 +30,6 @@ def prepare_dataset(
     dataset_name_or_path,
     test_class_frac=0.0,
     dataset_frac=1.0,
-    return_zero_shot_examples=False,
     class_field=None,
     test_set_name=None,
     build_class_sets=True,
@@ -50,8 +49,6 @@ def prepare_dataset(
 
         test_class_frac:
         dataset_frac:
-        return_zero_shot_examples: if yes, returns an extra dataset containing zero shot examples,
-            NOTE: returns none instead of a dataset if the original dataset does not contain this key
         class_field: name of the class key in the dataset
         build_class_sets: compute a set of unique test classes and all classes, return them as lists,
             if False, return None instead
@@ -84,8 +81,10 @@ def prepare_dataset(
         test_set = cat.utils.sample_dataset(test_set, p=dataset_frac)
 
         if "wiki" in dataset_name_or_path:
-            logger.warning("Sampling from a Wikipedia dataset may take a long time (~10+ minutes). "
-                           "Consider pre-sampling and saving it as a different file to speed up the experiments.")
+            logger.warning(
+                "Sampling from a Wikipedia dataset may take a long time (~10+ minutes). "
+                "Consider pre-sampling and saving it as a different file to speed up the experiments."
+            )
 
         _train_classes = set(train_set[class_field])
         _test_classes = set(test_set[class_field])
@@ -101,17 +100,13 @@ def prepare_dataset(
                 f"Sampling size is too small for the *test* set, only {len(_test_classes)} left"
             )
 
-    zero_shot_examples_set = None
     if test_class_frac > 0.0:
         if verbose:
             logger.info("Creating test classes")
 
-        train_set, zero_shot_examples_set = cat.utils.split_classes(
+        train_set, _ = cat.utils.split_classes(
             train_set, class_field=class_field, p_test_classes=test_class_frac, verbose=True
         )
-
-    if return_zero_shot_examples and test_class_frac == 0:
-        zero_shot_examples_set = dataset_dict.get("zero_shot_examples", None)
 
     all_classes, zero_shot_classes = [], []
     if build_class_sets:
@@ -128,15 +123,6 @@ def prepare_dataset(
         if len(zero_shot_classes) < 2:
             logger.warning(f"Less than two zero-shot classes in the split: {zero_shot_classes}")
 
-    if return_zero_shot_examples:
-        return (
-            train_set,
-            test_set,
-            list(all_classes),
-            list(zero_shot_classes),
-            zero_shot_examples_set,
-        )
-
     return train_set, test_set, list(all_classes), list(zero_shot_classes)
 
 
@@ -147,7 +133,6 @@ def prepare_dataloaders(
     model_name,
     dataset_frac=1.0,
     num_workers=8,
-    return_zero_shot_examples=False,
     text_field=None,
     class_field=None,
     test_set_name=None,
@@ -166,7 +151,6 @@ def prepare_dataloaders(
         batch_size: batch size for the dataloadres
         model_name: str, used as AutoTokenizer.from_pretrained(model_name)
         num_workers: number of workers in each dataloader
-        return_zero_shot_examples: if True, returns an unlabeled dataset with examples of zero-shot classes
         test_dataset_name_or_path: load a different dataset to evaluate on ("validation" field is used)
 
     Returns:
@@ -192,17 +176,10 @@ def prepare_dataloaders(
     if verbose:
         logger.info("Preparing training set")
 
-    (
-        reduced_train_set,
-        test_set,
-        all_classes_str,
-        test_classes_str,
-        zero_shot_examples,
-    ) = prepare_dataset(
+    reduced_train_set, test_set, all_classes_str, test_classes_str = prepare_dataset(
         dataset_name_or_path=dataset_name_or_path,
         test_class_frac=test_class_frac,
         dataset_frac=dataset_frac,
-        return_zero_shot_examples=True,
         class_field=class_field,
         test_set_name=test_set_name,
         build_class_sets=bool(test_dataset_name_or_path is None),  # only
@@ -210,6 +187,8 @@ def prepare_dataloaders(
     )
 
     if test_dataset_name_or_path:
+        ranking_test_set = test_set
+
         if verbose:
             logger.info("Preparing test set")
 
@@ -305,43 +284,29 @@ def prepare_dataloaders(
         shuffle=False,
     )
 
-    data = {"train": reduced_train_set, "test": test_set}
-
-    # TODO: figure out a better way to solve this
-    # or maybe just remove this feature
-    if return_zero_shot_examples:
-        if zero_shot_examples is None:
-            return (
-                train_dataloader,
-                test_dataloader,
-                all_classes_str,
-                test_classes_str,
-                data,
-                None,
-            )
-
-        zero_shot_examples_dataset = cat.CatDataset(
-            zero_shot_examples[class_field],
-            text_tokenizer,
-        )
-        zero_shot_examples_dataloader = DataLoader(
-            zero_shot_examples_dataset,
+    ranking_test_dataloader = None
+    if test_dataset_name_or_path:
+        # we use train collator here, because CatTest is classification-oriented
+        # and requires to know all possible classes in advance
+        # which is not realistic in ranking setting
+        ranking_test_dataloader = DataLoader(
+            ranking_test_set,
             batch_size=batch_size,
             collate_fn=train_collator,
             num_workers=num_workers,
-            shuffle=True,
+            shuffle=False,
         )
 
-        return (
-            train_dataloader,
-            test_dataloader,
-            all_classes_str,
-            test_classes_str,
-            data,
-            zero_shot_examples_dataloader,
-        )
+    data = {"train": reduced_train_set, "test": test_set}
 
-    return train_dataloader, test_dataloader, all_classes_str, test_classes_str, data
+    return (
+        train_dataloader,
+        test_dataloader,
+        all_classes_str,
+        test_classes_str,
+        data,
+        ranking_test_dataloader,
+    )
 
 
 def make_extra_classes_dataloader_from_file(
@@ -391,6 +356,7 @@ def train_cat_model(
     class_cos2_reg=None,
     adv_reg_weight=1.0,
     use_wasserstein_loss=False,
+    ranking_test_dataloader=None,
 ):
     _check_discriminator_triplet(discriminator, discriminator_optimizer, discriminator_update_freq)
 
@@ -429,6 +395,7 @@ def train_cat_model(
         device=device,
         labels_str=all_classes_str,
         zeroshot_labels=test_classes_str,
+        ranking_dataloader=ranking_test_dataloader,
     )
     metrics["global_step"] = global_step
 
@@ -510,6 +477,7 @@ def train_cat_model(
                     device=device,
                     labels_str=all_classes_str,
                     zeroshot_labels=test_classes_str,
+                    ranking_dataloader=ranking_test_dataloader,
                 )
                 extra_metrics = get_extra_metrics(
                     model=model,
@@ -531,6 +499,7 @@ def train_cat_model(
             labels_str=all_classes_str,
             zeroshot_labels=test_classes_str,
             predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,
+            ranking_dataloader=ranking_test_dataloader,
         )
         extra_metrics = get_extra_metrics(
             model=model,

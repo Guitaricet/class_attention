@@ -100,7 +100,6 @@ def model_factory(txt_encoder_kwargs=None, cls_encoder_kwargs=None, model_kwargs
     )
     label_encoder = transformers.AutoModel.from_config(
         transformers.BertConfig(
-            vocab_size=50,
             hidden_size=32,
             num_hidden_layers=2,
             intermediate_size=64,

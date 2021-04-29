@@ -1,6 +1,7 @@
 import pytest
 
 import datasets
+import torch
 import transformers
 
 import class_attention as cat
@@ -43,6 +44,7 @@ def test_make_test_classes_only_dataloader_integration():
         all_classes_str,
         test_classes_str,
         data,
+        _,
     ) = tests.utils.default_prepare_dataloaders(
         dataset_frac=1.0,
     )
@@ -57,3 +59,35 @@ def test_make_test_classes_only_dataloader_integration():
     )
 
     assert True
+
+
+def test_precision_at_k():
+    batch_size, hidden = 128, 3
+    x = cat.modelling_utils.normalize_embeds(torch.randn(batch_size, hidden))
+    y = cat.modelling_utils.normalize_embeds(torch.randn(batch_size, hidden))
+
+    p_full = cat.evaluation_utils.precision_at_k(x, x, k=1)
+    p_full_at5 = cat.evaluation_utils.precision_at_k(x, x, k=5)
+
+    assert p_full == 1.0
+    assert p_full_at5 == 1.0
+
+    p_random = cat.evaluation_utils.precision_at_k(x, y, k=1)
+    p_random_at5 = cat.evaluation_utils.precision_at_k(x, y, k=5)
+    assert p_random > 0
+    assert p_random_at5 > p_random
+
+
+def test_get_all_embeddings():
+    (
+        train_dataloader,
+        _,
+        _,
+        _,
+        _,
+        _,
+    ) = tests.utils.default_prepare_dataloaders()
+    model = tests.utils.model_factory()
+
+    text_embs, class_embs = cat.evaluation_utils.get_all_embeddings(model, train_dataloader)
+    assert text_embs.shape == class_embs.shape

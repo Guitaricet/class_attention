@@ -1,4 +1,7 @@
+import logging
 import math
+import os
+import sys
 
 import torch
 import transformers
@@ -7,6 +10,15 @@ from torch import nn as nn
 
 import class_attention as cat
 from class_attention.modelling import get_output_dim, ClassTransformerBlock
+
+
+logging.basicConfig(
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO,
+    stream=sys.stdout,
+)
+logger = logging.getLogger(os.path.basename(__file__))
 
 
 class ClassAttentionModel(nn.Module):
@@ -20,7 +32,6 @@ class ClassAttentionModel(nn.Module):
                 normalize_txt,
                 normalize_cls,
                 scale_attention,
-                remove_n_lowest_pc,
                 n_projection_layers,
                 attention_type,
                 temperature,
@@ -72,6 +83,11 @@ class ClassAttentionModel(nn.Module):
 
         cross_attention_layers = self.kwargs.get("cross_attention_layers", None)
         if cross_attention_layers is not None and cross_attention_layers > 0:
+            if self.kwargs.get("normalize_txt") or self.kwargs.get("normalize_cls"):
+                logger.warning(
+                    "ClassAttentionModel.embed_texts_and_labels does not perform normalization when using --cross-attention-layers"
+                )
+
             hidden_size = self.kwargs["hidden_size"]  # guaranteed in validate_kwargs
             self._final_hidden_size = hidden_size
 
@@ -155,18 +171,8 @@ class ClassAttentionModel(nn.Module):
         )
         cat.modelling_utils.validate_inputs(text_input, labels_input)
 
-        h_x = self.txt_encoder(**text_input, output_hidden_states=True)  # model output object
-
-        h_x = h_x.hidden_states[self.representation_layer]  # FloatTensor[bs, text_seq_len, hidden]
-        h_x = h_x[:, 0]  # get CLS token representations, FloatTensor[bs, hidden]
-
-        h_c = self.cls_encoder(**labels_input, output_hidden_states=True)  # some tuple
-        h_c = h_c.hidden_states[self.representation_layer]  # FloatTensor[n_classes, class_seq_len, hidden]
-        h_c = h_c[:, 0]  # get CLS token representations, FloatTensor[n_classes, hidden]
-
-        # maybe projections
-        h_x = self.txt_out(h_x)
-        h_c = self.cls_out(h_c)
+        # compute independent embeddings of texts (h_x) and labels (h_c)
+        h_x, h_c = self.embed_texts_and_labels(text_input, labels_input)
 
         h_x = self.dropout_x(h_x)
         h_c = self.dropout_c(h_c)
@@ -174,30 +180,13 @@ class ClassAttentionModel(nn.Module):
         if self.class_transformer is not None:
             h_x = self.class_transformer(text_emb=h_x, class_emb=h_c)
 
-        if self.kwargs.get("remove_n_lowest_pc"):
-            h_c = cat.modelling_utils.remove_smallest_princpial_component(
-                h_c, remove_n=self.kwargs.get("remove_n_lowest_pc")
-            )
+            # make all class embeddings to have a unit Euclidean norm
+            if self.kwargs.get("normalize_txt"):
+                h_x = cat.modelling_utils.normalize_embeds(h_x)
+            if self.kwargs.get("normalize_cls"):
+                h_c = cat.modelling_utils.normalize_embeds(h_c)
 
-        # make all class embeddings to have the same Euclidean norm
-        if self.kwargs.get("normalize_txt"):
-            h_x = cat.modelling_utils.normalize_embeds(h_x)
-        if self.kwargs.get("normalize_cls"):
-            h_c = cat.modelling_utils.normalize_embeds(h_c)
-
-        logits = h_x @ h_c.T  # [bs, n_classes]
-
-        assert logits.shape == (h_x.shape[0], h_c.shape[0]), logits.shape
-
-        # the scaling is extremely important if normalization is not used
-        if self.kwargs.get("scale_attention"):
-            logits = logits / (logits.size(-1) ** 0.5)
-
-        # apply temperature, clamp it if it is trainable
-        if self.kwargs.get("learn_temperature"):
-            self.temperature.data.clamp_(math.log(1e-3), math.log(1e3))
-
-        logits *= torch.exp(self.temperature)
+        logits = self.get_logits(h_x, h_c)
         logits = self.dropout_logits(logits)
 
         # fmt: off
@@ -211,6 +200,51 @@ class ClassAttentionModel(nn.Module):
         if return_embeddings:
             return logits, h_x, h_c
 
+        return logits
+
+    def embed_texts_and_labels(self, text_input, labels_input):
+        text_input, labels_input = cat.modelling_utils.maybe_format_inputs(
+            text_input, labels_input
+        )
+
+        h_x = self.txt_encoder(**text_input, output_hidden_states=True)  # model output object
+
+        h_x = h_x.hidden_states[self.representation_layer]  # FloatTensor[bs, text_seq_len, hidden]
+        h_x = h_x[:, 0]  # get CLS token representations, FloatTensor[bs, hidden]
+
+        h_c = self.cls_encoder(**labels_input, output_hidden_states=True)  # some tuple
+        h_c = h_c.hidden_states[self.representation_layer]  # FloatTensor[n_classes, class_seq_len, hidden]
+        h_c = h_c[:, 0]  # get CLS token representations, FloatTensor[n_classes, hidden]
+
+        # maybe projections
+        h_x = self.txt_out(h_x)
+        h_c = self.cls_out(h_c)
+
+        if self.class_transformer is not None:
+            return h_x, h_c
+
+        # make all class embeddings to have a unit Euclidean norm
+        if self.kwargs.get("normalize_txt"):
+            h_x = cat.modelling_utils.normalize_embeds(h_x)
+        if self.kwargs.get("normalize_cls"):
+            h_c = cat.modelling_utils.normalize_embeds(h_c)
+
+        return h_x, h_c
+
+    def get_logits(self, h_x, h_c):
+        logits = h_x @ h_c.T  # [bs, n_classes]
+
+        assert logits.shape == (h_x.shape[0], h_c.shape[0]), logits.shape
+
+        # the scaling is extremely important if normalization is not used
+        if self.kwargs.get("scale_attention"):
+            logits = logits / (logits.size(-1) ** 0.5)
+
+        # apply temperature, clamp it if it is trainable
+        if self.kwargs.get("learn_temperature"):
+            self.temperature.data.clamp_(math.log(1e-3), math.log(1e3))
+
+        logits *= torch.exp(self.temperature)
         return logits
 
     @staticmethod

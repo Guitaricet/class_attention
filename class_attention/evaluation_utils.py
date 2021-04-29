@@ -33,6 +33,7 @@ def evaluate_model(
     zeroshot_labels=None,
     progress_bar=False,
     predict_into_file=None,
+    ranking_dataloader=None,
 ):
     """Makes predictions on dataloader, reports metrics.
 
@@ -41,6 +42,8 @@ def evaluate_model(
         dataloader: pytorch DataLoader with CatTestCollator
         labels_str: List[str], names of classes, in the same order as in the CatTestCollator.possible_label_ids
         zeroshot_labels: if provided, additional metrics will be computed on this set of labels
+        ranking_dataloader: if provided, precision@k is computed on this one,
+            can consume a lot of time and **memory** for datasets >> 1000 examples
 
     Example output:
     {
@@ -121,8 +124,87 @@ def evaluate_model(
         res.update(zeroshot_metrics)
         res.update(multishot_metrics)
 
+    if ranking_dataloader is not None:
+        ranking_metrics = evaluate_ranking_model(model, ranking_dataloader)
+        res.update(ranking_metrics)
+
     model.train()
     return res
+
+
+# the code is adapted from
+# https://github.com/KevinMusgrave/pytorch-metric-learning/blob/dff4ae570db89dcb59a102f13f665502f9c1c7c6/src/pytorch_metric_learning/testers/base_tester.py#L79
+# MIT licence
+def get_all_embeddings(model, ranking_dataloader):
+    model.eval()
+    start, end = 0, 0
+
+    with torch.no_grad():
+        for i, (text, title, labels) in enumerate(ranking_dataloader):
+            # NOTE: you can get rid of title.index_select if you guarantee that labels == range(len(title))
+            ordered_titles = title.index_select(0, labels)
+            text_emb, title_emb = model.embed_texts_and_labels(text, ordered_titles)
+            batch_size = text_emb.size(0)
+
+            if i == 0:
+                all_text_embs = torch.zeros(
+                    len(ranking_dataloader.dataset),
+                    text_emb.size(1),
+                    device=text_emb.device,
+                    dtype=text_emb.dtype,
+                )
+                all_title_embs = torch.zeros(
+                    len(ranking_dataloader.dataset),
+                    title_emb.size(1),
+                    device=title_emb.device,
+                    dtype=title_emb.dtype,
+                )
+
+            end = start + batch_size
+            all_text_embs[start:end] = text_emb
+            all_title_embs[start:end] = title_emb
+            start = end
+
+    model.train()
+
+    return all_text_embs, all_title_embs
+
+
+def precision_at_k(x_embs, y_embs, k=1):
+    """we assume that x_embs[i] true label is y_embs[i]
+
+    Args:
+        x_embs:
+        y_embs:
+        k:
+
+    Returns:
+
+    """
+    assert x_embs.shape == y_embs.shape
+
+    n_matches = 0
+    for i, x_emb in enumerate(x_embs):
+        scores = y_embs @ x_emb.T  # [n_labels, 1]
+        values, indices = torch.topk(scores.squeeze(-1), k=k)
+        if i in indices:
+            n_matches += 1
+
+    return n_matches / len(x_embs)
+
+
+def evaluate_ranking_model(model, ranking_dataloader):
+    if len(ranking_dataloader.dataset) > 3000:
+        logger.warning(
+            "Evaluating on a relatively big dataset can take a long time as we perform brute-force KNN search"
+        )
+
+    all_text_embs, all_title_embs = get_all_embeddings(model, ranking_dataloader)
+
+    precision_at_1 = precision_at_k(all_text_embs, all_title_embs, k=1)
+    precision_at_5 = precision_at_k(all_text_embs, all_title_embs, k=5)
+
+    return {"rank_eval/P@1": precision_at_1, "rank_eval/P@5": precision_at_5}
 
 
 def predict(

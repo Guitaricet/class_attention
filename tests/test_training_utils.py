@@ -42,6 +42,7 @@ def test_prepare_dataloaders():
         all_classes_str,
         test_classes_str,
         data,
+        optional_ranking_dataset,
     ) = tests.utils.default_prepare_dataloaders()
 
     assert isinstance(train_dataloader, torch.utils.data.DataLoader)
@@ -57,6 +58,7 @@ def test_prepare_dataloaders():
     assert isinstance(data, dict)
     assert "train" in data
     assert "test" in data
+    assert optional_ranking_dataset is None
 
 
 def test_train_cat_model(accelerator):
@@ -67,6 +69,7 @@ def test_train_cat_model(accelerator):
         all_classes_str,
         test_classes_str,
         data,
+        _,
     ) = tests.utils.default_prepare_dataloaders()
 
     text_encoder = cat.modelling_utils.get_small_transformer()
@@ -96,6 +99,7 @@ def test_train_cat_model_discriminator(accelerator):
         all_classes_str,
         test_classes_str,
         data,
+        _,
     ) = tests.utils.default_prepare_dataloaders()
 
     text_encoder = cat.modelling_utils.get_small_transformer()
