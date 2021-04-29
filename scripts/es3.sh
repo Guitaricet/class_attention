@@ -287,4 +287,23 @@ python main.py \
 
 rm $SAVE_TO
 
+
+python main.py \
+  --dataset $DATASET \
+  --model $MODEL \
+  --batch-size 32 \
+  --lr 1e-5 \
+  --max-epochs 10 \
+  --early-stopping 3 \
+  --hidden 768 \
+  --random-cls-vectors \
+  --freeze-cls-network \
+  --eval-every-steps $EVAL_EVERY \
+  --save-to $SAVE_TO \
+  --tags $TAG,random-vectors \
+
+
+rm $SAVE_TO
+
+
 echo "Script finished"
