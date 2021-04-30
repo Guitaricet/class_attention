@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 from random import random
+from functools import partial
 
 import torch
 import torch.nn as nn
@@ -419,11 +420,15 @@ def train_cat_model(
 
     should_stop_early = False
 
+    maybe_progress_bar = lambda x: x
+    if len(train_dataloader.dataset) > 100_000:
+        maybe_progress_bar = partial(tqdm, total=len(train_dataloader))
+
     for epoch in tqdm(range(max_epochs), desc="Epochs"):
         if should_stop_early:
             break
 
-        for x, c, y in train_dataloader:
+        for x, c, y in maybe_progress_bar(train_dataloader):
             if c.shape[0] < 2:
                 logger.warning(f"Number of possible classes is {c.shape[0]}, skipping this batch")
                 continue
