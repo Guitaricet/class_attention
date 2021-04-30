@@ -123,13 +123,24 @@ class ClassAttentionModel(nn.Module):
         )
 
     @classmethod
+    def from_checkpoint(cls, checkpoint_path, map_location="cpu"):
+        checkpoint = torch.load(checkpoint_path, map_location=map_location)
+        kwargs = checkpoint["model_args"]
+        state_dict = checkpoint["model_state_dict"]
+
+        model = cls.from_kwargs(**kwargs)
+        model.load_state_dict(state_dict)
+
+        return model
+
+    @classmethod
     def get_state_dict_from_checkpoint(cls, checkpoint_path, map_location="cpu"):
         state_dict = torch.load(checkpoint_path, map_location=map_location)
         model_state_dict = state_dict["model_state_dict"]
         return model_state_dict
 
-    def load_state_dict_from_checkpoint(self, checkpoint_path):
-        model_state_dict = self.get_state_dict_from_checkpoint(checkpoint_path)
+    def load_state_dict_from_checkpoint(self, checkpoint_path, map_location=None):
+        model_state_dict = self.get_state_dict_from_checkpoint(checkpoint_path, map_location=map_location)
         self.load_state_dict(model_state_dict, strict=True)
 
     def save(self, file_path, optimizer=None, **kwargs):

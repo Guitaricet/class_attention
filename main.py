@@ -31,7 +31,7 @@ def parse_args(args=None):
     parser = argparse.ArgumentParser()
 
     # fmt: off
-    # data
+    # Data
     parser.add_argument("--dataset", default=DATASET,
                         help="Name or path to a HuggingFace Datasets dataset")
     parser.add_argument("--test-dataset", default=None,
@@ -48,7 +48,13 @@ def parse_args(args=None):
     parser.add_argument("--test-class-field", default=None, type=str)
     parser.add_argument("--max-text-length", default=512, type=int)
 
-    # architecture
+    # Fine-tuning
+    parser.add_argument("--load-from-checkpoint", default=None, type=str,
+                        help="If provided, instead of creating a model, it is restored from a checkpoint file. "
+                             "Checkpoint path is a .pt file storing dict with keys `model_args` to build the model "
+                             "architecture and `model_state_dict` to load weights")
+
+    # Architecture
     parser.add_argument("--model", default=MODEL, type=str)
     parser.add_argument("--hidden-size", default=128, type=int)
     parser.add_argument("--normalize-txt", default=False, action="store_true")
@@ -182,6 +188,24 @@ def parse_args(args=None):
         args.test_text_field = args.test_text_field or args.text_field
         args.test_class_field = args.test_class_field or args.class_field
 
+    if args.load_from_checkpoint:
+        logger.info("Architecture arguments provided to the script are ignored in case of --finetune-cat-model")
+        logger.info("Loading architecture arguments form the checkpoint")
+        checkpoint_args = torch.load(args.load_from_checkpoint, map_location="cpu")["model_args"]
+
+        args.model = checkpoint_args["model"]
+        args.hidden_size = checkpoint_args["hidden_size"]
+        args.normalize_txt = checkpoint_args["normalize_txt"]
+        args.normalize_cls = checkpoint_args["normalize_cls"]
+        args.scale_attention = checkpoint_args["scale_attention"]
+        args.temperature = checkpoint_args["temperature"]
+        args.learn_temperature = checkpoint_args["learn_temperature"]
+        args.representation_layer = checkpoint_args["representation_layer"]
+        args.n_projection_layers = checkpoint_args["n_projection_layers"]
+        args.cross_attention_layers = checkpoint_args["cross_attention_layers"]
+        args.no_bias = checkpoint_args["no_bias"]
+        args.random_cls_vectors = checkpoint_args["random_cls_vectors"]
+
     return args
 
 
@@ -247,6 +271,9 @@ def main(args):
         label_encoder,
         **vars(args),
     )
+
+    if args.load_from_checkpoint:
+        model.load_state_dict_from_checkpoint(args.load_from_checkpoint)
 
     parameters = model.get_trainable_parameters()
     optimizer = torch.optim.Adam(parameters, lr=args.lr)

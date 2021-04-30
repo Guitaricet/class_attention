@@ -36,10 +36,16 @@ def test_getitem_wcrop():
     train_labels = [[1,], [3,], [2, 3], [1,]]
     # fmt: on
 
-    arrow_dataset = datasets.Dataset.from_dict({"text_ids": train_texts, "label_ids": train_labels})
+    arrow_dataset = datasets.Dataset.from_dict(
+        {"text_ids": train_texts, "label_ids": train_labels}
+    )
 
     dataset = cat.PreprocessedCatDatasetWCropAug(
-        dataset=arrow_dataset, text_field="text_ids", class_field="label_ids", tokenizer=None, max_text_len=5
+        dataset=arrow_dataset,
+        text_field="text_ids",
+        class_field="label_ids",
+        tokenizer=None,
+        max_text_len=5,
     )
     x, y = dataset[0]
 

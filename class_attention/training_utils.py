@@ -208,7 +208,9 @@ def prepare_dataloaders(
     # Datasets
     if "ids" in text_field:  # means the dataset is preprocessed
         if verbose:
-            logger.info("The training dataset is preprocessed, creating PreprocessedCatDatasetWCropAug object")
+            logger.info(
+                "The training dataset is preprocessed, creating PreprocessedCatDatasetWCropAug object"
+            )
 
         reduced_train_dataset = cat.PreprocessedCatDatasetWCropAug(
             dataset=reduced_train_set,
@@ -339,7 +341,9 @@ def make_extra_classes_dataloader_from_file(
 
     words_dataset = cat.CatDataset(class_names, tokenizer)
     collator = cat.CatCollator(pad_token_id=tokenizer.pad_token_id)
-    dataloader = DataLoader(words_dataset, collate_fn=collator, batch_size=batch_size, shuffle=True)
+    dataloader = DataLoader(
+        words_dataset, collate_fn=collator, batch_size=batch_size, shuffle=True
+    )
     return dataloader
 
 
@@ -579,8 +583,7 @@ def train_cat_model(
 
     if early_stopping is not None and save_path is not None:
         logger.info(f"Loading the best model, expecting {monitor_name} to be {best_monitor}")
-        state_dict = torch.load(save_path)["model_state_dict"]
-        model.load_state_dict(state_dict)
+        model.load_state_dict_from_checkpoint(save_path)
 
     return model
 
