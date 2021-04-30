@@ -408,7 +408,6 @@ def train_cat_model(
     metrics = cat.evaluation_utils.evaluate_model(
         model,
         test_dataloader,
-        device=device,
         labels_str=all_classes_str,
         zeroshot_labels=test_classes_str,
         ranking_dataloader=ranking_test_dataloader,
@@ -499,7 +498,6 @@ def train_cat_model(
                 metrics = cat.evaluation_utils.evaluate_model(
                     model=model,
                     dataloader=test_dataloader,
-                    device=device,
                     labels_str=all_classes_str,
                     zeroshot_labels=test_classes_str,
                     ranking_dataloader=ranking_test_dataloader,
@@ -543,7 +541,6 @@ def train_cat_model(
         metrics = cat.evaluation_utils.evaluate_model(
             model=model,
             dataloader=test_dataloader,
-            device=device,
             labels_str=all_classes_str,
             zeroshot_labels=test_classes_str,
             predict_into_file=predict_into_file if (epoch == max_epochs - 1) else None,

@@ -72,7 +72,7 @@ def dataloader(train_texts, train_labels, possible_labels_str):
 def test_valiadte_model_per_class_on_dataloader(random_model, dataloader):
     labels = ["My News", "Weather", "Sport"]
     metrics = cat.evaluation_utils.evaluate_model(
-        random_model, dataloader, device="cpu", labels_str=labels, zeroshot_labels=["My News"]
+        random_model, dataloader, labels_str=labels, zeroshot_labels=["My News"]
     )
 
     assert 0 <= metrics["eval/acc"] <= 1

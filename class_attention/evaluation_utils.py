@@ -28,7 +28,6 @@ logger = logging.getLogger(os.path.basename(__file__))
 def evaluate_model(
     model,
     dataloader,
-    device,
     labels_str,
     zeroshot_labels=None,
     progress_bar=False,
@@ -82,7 +81,6 @@ def evaluate_model(
         model=model,
         dataloader=dataloader,
         labels_str=labels_str,
-        device=device,
         return_texts=(predict_into_file is not None),
         progress_bar=progress_bar,
     )
@@ -208,7 +206,7 @@ def evaluate_ranking_model(model, ranking_dataloader):
 
 
 def predict(
-    model, dataloader, labels_str, device, return_texts=False, progress_bar=False
+    model, dataloader, labels_str, return_texts=False, progress_bar=False
 ) -> (List, List, List):
     """Makes predictions on dataloader, reports metrics.
 
@@ -223,8 +221,6 @@ def predict(
         tuple (all_predictions, all_labels, all_texts) where everything
         is a list of strings
     """
-
-    model = model.to(device)
     model.eval()
 
     all_predictions = []
@@ -238,8 +234,6 @@ def predict(
     with torch.no_grad():
         for x, c, y in dataloader:
             # Note: `c` does not change in CatTestCollator
-            x, c, y = x.to(device), c.to(device), y.to(device)
-
             logits = model(x, c)
 
             _, preds = logits.max(-1)
@@ -265,10 +259,7 @@ def evaluate_model_on_subset(
     text_tokenizer,
     label_tokenizer,
     predict_into_file=None,
-    device=None,
 ):
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # dataset filtration happens in make_test_classes_only_dataloader
     test_dataloader = make_test_classes_only_dataloader(
@@ -283,7 +274,6 @@ def evaluate_model_on_subset(
     subset_metrics = evaluate_model(
         model,
         test_dataloader,
-        device=device,
         labels_str=test_classes_str,
         zeroshot_labels=None,  # it needs to be None, so that the metrics are not splitted in two subsets
         predict_into_file=predict_into_file,

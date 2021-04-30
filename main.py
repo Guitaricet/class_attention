@@ -366,7 +366,6 @@ def main(args):
             text_tokenizer=test_dataloader.dataset.text_tokenizer,
             label_tokenizer=test_dataloader.dataset.label_tokenizer,
             predict_into_file=predict_into_file,
-            device=accelerator.device,
         )
 
         if args.predict_into_folder is not None:
@@ -385,13 +384,12 @@ def main(args):
         multi_shot_only_metrics = cat.evaluation_utils.evaluate_model_on_subset(
             model=model,
             dataset_str=data["test"],
-            text_field=args.text_field,
-            class_field=args.class_field,
+            text_field=args.test_text_field or args.text_field,
+            class_field=args.test_class_field or args.class_field,
             test_classes_str=multi_shot_classes,
             text_tokenizer=test_dataloader.dataset.text_tokenizer,
             label_tokenizer=test_dataloader.dataset.label_tokenizer,
             predict_into_file=predict_into_file,
-            device=accelerator.device,
         )
 
         if predict_into_file is not None:
