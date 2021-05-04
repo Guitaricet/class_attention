@@ -367,6 +367,7 @@ def main(args):
             text_tokenizer=test_dataloader.dataset.text_tokenizer,
             label_tokenizer=test_dataloader.dataset.label_tokenizer,
             predict_into_file=predict_into_file,
+            accelerator=accelerator,
         )
 
         if args.predict_into_folder is not None:
@@ -391,6 +392,7 @@ def main(args):
             text_tokenizer=test_dataloader.dataset.text_tokenizer,
             label_tokenizer=test_dataloader.dataset.label_tokenizer,
             predict_into_file=predict_into_file,
+            accelerator=accelerator,
         )
 
         if predict_into_file is not None:

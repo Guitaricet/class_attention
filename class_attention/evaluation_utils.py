@@ -258,8 +258,25 @@ def evaluate_model_on_subset(
     test_classes_str,
     text_tokenizer,
     label_tokenizer,
+    accelerator,
     predict_into_file=None,
 ):
+    """
+
+    Args:
+        model: CatModel
+        dataset_str: ArrowDataset with texts and textual description of classes
+        text_field: text field name in dataset_str
+        class_field: class field name in dataset_str
+        test_classes_str: a list of test class names that will be used for evaluation
+        text_tokenizer: transformers.Tokenizer object used to encode texts
+        label_tokenizer: transformers.Tokenizer object used to encode class descripitons
+        accelerator: accelerate.Accelerator object
+        predict_into_file: if specified, save predictions into a file with this path
+
+    Returns:
+        dict {str: float} with metrics, same as cat.evaluation_utils.evaluate_model
+    """
 
     # dataset filtration happens in make_test_classes_only_dataloader
     test_dataloader = make_test_classes_only_dataloader(
@@ -270,6 +287,7 @@ def evaluate_model_on_subset(
         text_field=text_field,
         class_field=class_field,
     )
+    test_dataloader = accelerator.prepare_data_loader(test_dataloader)
 
     subset_metrics = evaluate_model(
         model,
