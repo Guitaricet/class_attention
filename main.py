@@ -273,6 +273,7 @@ def main(args):
     )
 
     if args.load_from_checkpoint:
+        logger.info(f"Loading class attention weights from a checkpoint {args.load_from_checkpoint}")
         model.load_state_dict_from_checkpoint(args.load_from_checkpoint)
 
     parameters = model.get_trainable_parameters()

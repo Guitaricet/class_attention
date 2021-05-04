@@ -142,11 +142,15 @@ def split_classes(dataset, class_field, p_test_classes=None, test_classes=None, 
         print(f"Moving the following classes to a class-test set: {test_classes}")
 
     test_classes = {t.lower() for t in test_classes}
-    test_mask = [c.lower() in test_classes for c in dataset[class_field]]
-    train_mask = [not m for m in test_mask]
+    train_ids, test_ids = [], []
+    for i, c in enumerate(dataset[class_field]):
+        if c.lower() in test_classes:
+            test_ids.append(i)
+        else:
+            train_ids.append(i)
 
-    test_subset = dataset[test_mask]
-    train_subset = dataset[train_mask]  # NOTE: dict of lists, not a list of dicts
+    test_subset = dataset[test_ids]
+    train_subset = dataset[train_ids]  # NOTE: dict of lists, not a list of dicts
 
     assert set(test_classes) == set(c.lower() for c in test_subset[class_field])
 
