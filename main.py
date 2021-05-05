@@ -137,6 +137,7 @@ def parse_args(args=None):
                         help="Specify this to save predictions into a bunch of files in this folder.")
     parser.add_argument("--tags", default=None)
     parser.add_argument("--n-workers", default=8, type=int)
+    parser.add_argument("--no-pin-memory", default=False, action="store_true")
     parser.add_argument("--save-to", default=None, type=str,
                         help="Checkpoint file to save the model state, optimizer state and script arguments")
     parser.add_argument("--wandb-name", default=None, type=str,
@@ -361,8 +362,8 @@ def main(args):
         zero_shot_only_metrics = cat.evaluation_utils.evaluate_model_on_subset(
             model=model,
             dataset_str=data["test"],
-            text_field=args.text_field,
-            class_field=args.class_field,
+            text_field=args.test_text_field or args.text_field,
+            class_field=args.test_class_field or args.class_field,
             test_classes_str=test_classes_str,
             text_tokenizer=test_dataloader.dataset.text_tokenizer,
             label_tokenizer=test_dataloader.dataset.label_tokenizer,
