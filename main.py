@@ -47,6 +47,8 @@ def parse_args(args=None):
     parser.add_argument("--test-text-field", default=None, type=str)
     parser.add_argument("--test-class-field", default=None, type=str)
     parser.add_argument("--max-text-length", default=512, type=int)
+    parser.add_argument("--evaluate-on", default="validation", type=str,
+                        help="a split name to evaluate the model on")
 
     # Fine-tuning
     parser.add_argument("--load-from-checkpoint", default=None, type=str,
@@ -94,8 +96,6 @@ def parse_args(args=None):
     parser.add_argument("--eval-every-steps", default=None, type=int,
                         help="evaluate model each --eval-every-steps steps; does not affect early stopping")
     parser.add_argument("--label-smoothing", default=None, type=float)
-    parser.add_argument("--evaluate-on", default="validation", type=str,
-                        help="a split name to evaluate the model on")
 
     # Layer freezing and parameter sharing
     parser.add_argument("--freeze-projections", default=False, action="store_true",
@@ -176,11 +176,9 @@ def parse_args(args=None):
         args.wasserstein = bool(int(args.wasserstein_for_sweeps))
         args.wasserstein_for_sweeps = None
 
-    text_field, class_field = cat.utils.infer_field_names(
+    args.text_field, args.class_field = cat.utils.infer_field_names(
         args.dataset, text_field=args.text_field, class_field=args.class_field
     )
-    args.text_field = text_field
-    args.class_field = class_field
 
     if args.test_dataset is not None:
         logger.info(
@@ -190,7 +188,9 @@ def parse_args(args=None):
         args.test_class_field = args.test_class_field or args.class_field
 
     if args.load_from_checkpoint:
-        logger.info("Architecture arguments provided to the script are ignored in case of --finetune-cat-model")
+        logger.info(
+            "Architecture arguments provided to the script are ignored in case of --finetune-cat-model"
+        )
         logger.info("Loading architecture arguments form the checkpoint")
         checkpoint_args = torch.load(args.load_from_checkpoint, map_location="cpu")["model_args"]
 
@@ -274,7 +274,9 @@ def main(args):
     )
 
     if args.load_from_checkpoint:
-        logger.info(f"Loading class attention weights from a checkpoint {args.load_from_checkpoint}")
+        logger.info(
+            f"Loading class attention weights from a checkpoint {args.load_from_checkpoint}"
+        )
         model.load_state_dict_from_checkpoint(args.load_from_checkpoint)
 
     parameters = model.get_trainable_parameters()

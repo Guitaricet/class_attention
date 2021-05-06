@@ -129,9 +129,9 @@ def prepare_dataset(
 
 def prepare_dataloaders(
     dataset_name_or_path,
-    test_class_frac,
     batch_size,
     model_name,
+    test_class_frac=0,
     dataset_frac=1.0,
     num_workers=8,
     text_field=None,
