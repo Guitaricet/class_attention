@@ -204,6 +204,7 @@ def parse_args(args=None):
         args.representation_layer = checkpoint_args["representation_layer"]
         args.n_projection_layers = checkpoint_args["n_projection_layers"]
         args.cross_attention_layers = checkpoint_args["cross_attention_layers"]
+        args.cross_attention_heads = checkpoint_args["cross_attention_heads"]
         args.no_bias = checkpoint_args["no_bias"]
         args.random_cls_vectors = checkpoint_args["random_cls_vectors"]
 
