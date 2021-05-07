@@ -1,6 +1,7 @@
 transformers==4.5.1
 tokenizers==0.10.2
-datasets==1.2.1
+sentence-transformers
+datasets==1.6.2
 sklearn
 wandb~=0.10.21
 matplotlib
