@@ -51,4 +51,4 @@ print("Training index")
 data["train"].add_faiss_index(column="text_emb", string_factory=INDEX_STR, train_size=300_000, metric_type=faiss.METRIC_INNER_PRODUCT)
 
 print("Saving index")
-data["train"].save_faiss_index(f"../data/wikipedia_rank_index_{suffix}.faiss")
+data["train"].save_faiss_index("text_emb", f"../data/wikipedia_rank_index_{suffix}.faiss")
