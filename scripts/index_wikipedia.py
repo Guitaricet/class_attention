@@ -1,16 +1,26 @@
-import numpy as np
 import datasets
 import faiss
-import tensorflow_hub as hub
+from sentence_transformers import SentenceTransformer
 
+print("Loading the model")
+model = SentenceTransformer("nli-distilroberta-base-v2")
+batch_size = 64
+suffix = "nli_distilroberta_base_v2_encoded"
 
-embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
+print("Loading the data")
 data = datasets.load_from_disk('../data/wikipedia_rank_nocache_May6')
 
-def map_fn(x):
-    return {"text_emb": embed(x["text"]).numpy(), "title_emb": embed(x["title"]).numpy()}
+def embed(texts):
+    return model.encode(texts, batch_size=batch_size)
 
-data["train"] = data["train"].map(map_fn, batched=True, batch_size=64)
+def map_fn(x):
+    return {"text_emb": embed(x["text"]), "title_emb": embed(x["title"])}
+
+print("Encoding")
+data["train"] = data["train"].map(map_fn, batched=True, batch_size=batch_size)
+
+print("Saving data to disk")
+data.save_to_disk("../data/wikipedia_rank" + suffix)
 
 # Index choice:
 # transform = "OPQ"
@@ -34,8 +44,11 @@ data["train"] = data["train"].map(map_fn, batched=True, batch_size=64)
 #
 # index = faiss.index_factory(512, index_recipe) # "OPQ64_128,IVF1024,PQ64x4f"
 
-INDEX_STR = "OPQ64_128,IVF1024,PQ64x4fs"
-data["train"].add_faiss_index(column="text_emb", string_factory=INDEX_STR, train_size=100_000, metric_type=faiss.METRIC_INNER_PRODUCT)
+print("Building index object")
+INDEX_STR = "OPQ64_128,IVF65536_HNSW32,PQ64x4fs"
 
-data.save_to_disk("../data/wikipedia_rank_USE4_encoded")
-data["train"].save_faiss_index("../data/wikipedia_rank_USE4_encoded_text_emb.faiss")
+print("Training index")
+data["train"].add_faiss_index(column="text_emb", string_factory=INDEX_STR, train_size=300_000, metric_type=faiss.METRIC_INNER_PRODUCT)
+
+print("Saving index")
+data["train"].save_faiss_index(f"../data/wikipedia_rank_index_{suffix}.faiss")
