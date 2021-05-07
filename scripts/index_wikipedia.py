@@ -20,7 +20,7 @@ print("Encoding")
 data["train"] = data["train"].map(map_fn, batched=True, batch_size=batch_size)
 
 print("Saving data to disk")
-data.save_to_disk("../data/wikipedia_rank" + suffix)
+data.save_to_disk("../data/wikipedia_rank_" + suffix)
 
 # Index choice:
 # transform = "OPQ"
