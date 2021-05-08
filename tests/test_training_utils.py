@@ -7,10 +7,10 @@ from accelerate import Accelerator
 
 import class_attention as cat
 import tests.utils
+from tests.utils import DATASET
 
 np.random.seed(8)
 torch.manual_seed(41)
-DATASET = "Fraser/news-category-dataset"
 
 
 @pytest.fixture

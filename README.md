@@ -60,6 +60,11 @@ python main.py \
 
 ```
 
-## Known issues
+### Some scripts we ran
 
-* Datasets==1.2.1 is required, newer versions may not work correctly
+```bash
+cd scripts
+# run notebooks/25_wikipedia.ipynb to create wikipedia_rank_nochache_May6
+python index_wikipedia.py
+python tokenize_wikipedia.py --dataset ../data/wikipedia_ranknli_distilroberta_base_v2_encoded --tokenizer distilbert-base-uncased
+```

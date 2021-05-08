@@ -142,6 +142,8 @@ def prepare_dataloaders(
     test_class_field=None,
     verbose=False,
     max_text_length=512,
+    faiss_index_path=None,
+    index_field=None,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -153,6 +155,8 @@ def prepare_dataloaders(
         model_name: str, used as AutoTokenizer.from_pretrained(model_name)
         num_workers: number of workers in each dataloader
         test_dataset_name_or_path: load a different dataset to evaluate on ("validation" field is used)
+        faiss_index_path: path to a faiss index for the dataset, use scripts/index_wikipedia.py to produce it
+        index_field: dataset field name that is associated with the faiss index
 
     Returns:
         tuple (train_dataloader, test_dataloader, all_classes_str, test_classes_str)
@@ -213,13 +217,26 @@ def prepare_dataloaders(
                 "The training dataset is preprocessed, creating PreprocessedCatDatasetWCropAug object"
             )
 
-        reduced_train_dataset = cat.PreprocessedCatDatasetWCropAug(
-            dataset=reduced_train_set,
-            text_field=text_field,
-            class_field=class_field,
-            tokenizer=text_tokenizer,
-            max_text_len=max_text_length,
-        )
+        if faiss_index_path is None:
+            reduced_train_dataset = cat.PreprocessedCatDatasetWCropAug(
+                dataset=reduced_train_set,
+                text_field=text_field,
+                class_field=class_field,
+                tokenizer=text_tokenizer,
+                max_text_len=max_text_length,
+            )
+
+        else:
+            logger.info("Using hard negatives sampling. One epoch will take much longer to compute.")
+
+            reduced_train_dataset = cat.hard_negatives.HardNegativeDatasetWAug(
+                dataset=reduced_train_set,
+                batch_size=batch_size,
+                text_ids_field=text_field,
+                label_ids_field=class_field,
+                index_field=index_field,
+                collator=cat.CatCollator(pad_token_id=text_tokenizer.pad_token_id),
+            )
 
         ranking_test_dataset = cat.PreprocessedCatDatasetWCropAug(
             dataset=ranking_test_set,
@@ -280,14 +297,25 @@ def prepare_dataloaders(
         possible_labels_ids=all_classes_ids, pad_token_id=label_tokenizer.pad_token_id
     )
 
-    train_dataloader = DataLoader(
-        reduced_train_dataset,
-        batch_size=batch_size,
-        collate_fn=train_collator,
-        num_workers=num_workers,
-        pin_memory=True,
-        shuffle=True,
-    )
+    if faiss_index_path is None:
+        train_dataloader = DataLoader(
+            reduced_train_dataset,
+            batch_size=batch_size,
+            collate_fn=train_collator,
+            num_workers=num_workers,
+            pin_memory=True,
+            shuffle=True,
+        )
+    else:
+        assert index_field is not None
+
+        train_dataloader = DataLoader(
+            reduced_train_dataset,
+            batch_size=None,
+            batch_sampler=None,
+            num_workers=0,  # TODO: can we increase this?
+        )
+
 
     test_dataloader = DataLoader(
         test_dataset,

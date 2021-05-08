@@ -49,6 +49,10 @@ def parse_args(args=None):
     parser.add_argument("--max-text-length", default=512, type=int)
     parser.add_argument("--evaluate-on", default="validation", type=str,
                         help="a split name to evaluate the model on")
+    parser.add_argument("--faiss-index-path", default=None, type=str,
+                        help="path to a faiss index for the --dataset, use scripts/index_wikipedia.py to produce it")
+    parser.add_argument("--index-field", default="text_emb", type=str,
+                        help="dataset field name that is associated with the faiss index")
 
     # Fine-tuning
     parser.add_argument("--load-from-checkpoint", default=None, type=str,
@@ -241,6 +245,8 @@ def main(args):
         test_class_field=args.test_class_field,
         max_text_length=args.max_text_length,
         verbose=True,
+        faiss_index_path=args.faiss_index_path,
+        index_field=args.index_field,
     )
 
     wandb.config.update(

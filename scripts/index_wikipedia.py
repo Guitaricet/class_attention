@@ -1,6 +1,9 @@
+import torch
 import datasets
 import faiss
 from sentence_transformers import SentenceTransformer
+torch.set_grad_enabled(False)
+
 
 print("Loading the model")
 model = SentenceTransformer("nli-distilroberta-base-v2")

@@ -31,7 +31,7 @@ def parse_args(args=None):
     parser.add_argument("--num-proc", default=20, type=int)
     # fmt: on
 
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     return args
 

@@ -1,9 +1,9 @@
 import os
 
+import datasets
 import transformers
 
 import class_attention as cat
-from tests.test_training_utils import DATASET
 
 GLOVE_TMP_PATH = "glove.glove"
 EXTRA_CLASSES_TMP_PATH = "extra_classes.txt"
@@ -50,6 +50,7 @@ CLASS_NAMES = {
     "WORLD NEWS",
     "WORLDPOST",
 }
+DATASET = "Fraser/news-category-dataset"
 
 
 def make_glove_file():
@@ -133,3 +134,13 @@ def default_prepare_dataloaders(**kwargs):
     return cat.training_utils.prepare_dataloaders(
         **_kwargs,
     )
+
+
+def dataset_factory(**kwargs):
+    _kwargs = dict(
+        path=DATASET,
+    )
+    for key, value in kwargs.items():
+        _kwargs[key] = value
+
+    return datasets.load_dataset(**_kwargs)
