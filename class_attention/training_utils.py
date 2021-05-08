@@ -238,6 +238,7 @@ def prepare_dataloaders(
                 batch_size=batch_size,
                 text_ids_field=text_field,
                 label_ids_field=class_field,
+                tokenizer=text_tokenizer,
                 index_field=index_field,
                 collator=cat.CatCollator(pad_token_id=text_tokenizer.pad_token_id),
             )

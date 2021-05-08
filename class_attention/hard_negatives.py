@@ -17,6 +17,7 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
         label_ids_field: str,
         index_field: str,
         collator,  # CatCollator
+        tokenizer,
         percent_hard: float = 0.5,
         max_text_len=512,
         no_augmentations=False,
@@ -32,6 +33,7 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
             label_ids_field: name of the field in the dataset containing numericalized label name
             index_field: the field in the dataset that is FAISS indexed
             collator: CatCollator
+            tokenizer: tokenizer used for both text_tokenizer and label_tokenizer fields
         """
         # nothing happens with the dataset inside super().__init__
         super().__init__()
@@ -47,6 +49,8 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
         self.collator = collator
         self.max_text_len = max_text_len
         self.no_augmentations = no_augmentations
+        self.text_tokenizer = tokenizer
+        self.label_tokenizer = tokenizer
 
         # fmt: off
         if self.presample_batch_size() == self.batch_size:
