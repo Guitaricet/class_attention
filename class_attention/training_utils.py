@@ -646,10 +646,13 @@ def maybe_compute_new_hc(x, h_c, model, extra_classes_dataloader, real_hc_prob=0
 
 
 def validate_dataloader(dataloader: DataLoader, test_classes, is_test=False):
+    # fmt: off
     if is_test:
         assert isinstance(dataloader.sampler, torch.utils.data.sampler.SequentialSampler)
     else:
-        assert isinstance(dataloader.sampler, torch.utils.data.sampler.RandomSampler)
+        assert isinstance(dataloader.sampler, torch.utils.data.sampler.RandomSampler) \
+            or isinstance(dataloader.dataset, cat.hard_negatives.HardNegativeDatasetWAug)
+    # fmt: on
 
     if isinstance(dataloader.dataset, cat.CatDataset):
         dataset: cat.CatDataset = dataloader.dataset
