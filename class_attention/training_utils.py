@@ -175,6 +175,9 @@ def prepare_dataloaders(
     if "wiki" in dataset_name_or_path and test_dataset_name_or_path is None:
         raise NotImplementedError()
 
+    if faiss_index_path is not None and dataset_frac < 1.0:
+        logger.warning("faiss index should not be used with dataset_frac < 1.0")
+
     test_text_field = test_text_field or text_field
     test_class_field = test_class_field or class_field
 
@@ -228,6 +231,7 @@ def prepare_dataloaders(
 
         else:
             logger.info("Using hard negatives sampling. One epoch will take much longer to compute.")
+            reduced_train_set.load_faiss_index(index_name=index_field, file=faiss_index_path)
 
             reduced_train_dataset = cat.hard_negatives.HardNegativeDatasetWAug(
                 dataset=reduced_train_set,
