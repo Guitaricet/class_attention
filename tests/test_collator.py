@@ -3,6 +3,8 @@ import pytest
 import torch
 import class_attention as cat
 
+import tests.utils
+
 
 def test_cat_collator():
     collator = cat.CatCollator(pad_token_id=0)
@@ -56,6 +58,26 @@ def test_cat_test_collator():
     assert torch.all(batch_x == expected_batch_x)
     assert torch.all(unique_labels == expected_unique_labels)
     assert torch.all(targets == expected_targets)
+
+
+def test_cat_test_collator_workers():
+    # fmt: off
+    (
+        train_dataloader,
+        test_dataloader,
+        all_classes_str,
+        test_classes_str,
+        data,
+        _,
+    ) = tests.utils.default_prepare_dataloaders(
+        dataset_frac=0.5,
+        num_workers=8,
+        batch_size=512,
+    )
+    # fmt: on
+
+    for x, y, c in test_dataloader:
+        pass
 
 
 def test_get_difference():

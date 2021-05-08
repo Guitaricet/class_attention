@@ -318,8 +318,8 @@ def prepare_dataloaders(
             batch_size=None,
             batch_sampler=None,
             num_workers=0,  # TODO: can we increase this?
+            collate_fn=lambda x: x[0],  # DataLoader it creates a list of one element
         )
-
 
     test_dataloader = DataLoader(
         test_dataset,
