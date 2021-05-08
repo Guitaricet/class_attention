@@ -79,34 +79,34 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
             yield batch
 
     def __iter__(self):
-        presample_idx = next(self._presample())  # sample R examples randomly
-        n_presampled = len(presample_idx)  # R, may vary
+        for presample_idx in self._presample():  # sample R examples randomly
+            n_presampled = len(presample_idx)  # R, may vary
 
-        if n_presampled == self.batch_size:
-            assert NotImplementedError()
-            # should we return ids or items?
-            # return presample_idx
+            if n_presampled == self.batch_size:
+                assert NotImplementedError()
+                # should we return ids or items?
+                # return presample_idx
 
-        random_samples = self.dataset[presample_idx]  # returns dict of lists
+            random_samples = self.dataset[presample_idx]  # returns dict of lists
 
-        n_hard_samples = self.batch_size - n_presampled  # H = B - R
-        hard_samples_batch = self.find_hard_samples_for_random_samples(
-            random_samples=random_samples,
-            n_random_samples=n_presampled,
-            n_hard_samples=n_hard_samples,
-        )
+            n_hard_samples = self.batch_size - n_presampled  # H = B - R
+            hard_samples_batch = self.find_hard_samples_for_random_samples(
+                random_samples=random_samples,
+                n_random_samples=n_presampled,
+                n_hard_samples=n_hard_samples,
+            )
 
-        random_samples_list = self._dataset_dict_to_tuples(random_samples)
-        hard_samples_list = self._flatten_batched_knn_results(hard_samples_batch, max_len=n_hard_samples)
+            random_samples_list = self._dataset_dict_to_tuples(random_samples)
+            hard_samples_list = self._flatten_batched_knn_results(hard_samples_batch, max_len=n_hard_samples)
 
-        all_samples_list = random_samples_list + hard_samples_list
-        all_samples_list = self._tensorify_examples(all_samples_list)
-        all_samples_list = self._crop_tensorified_examples(all_samples_list)
+            all_samples_list = random_samples_list + hard_samples_list
+            all_samples_list = self._tensorify_examples(all_samples_list)
+            all_samples_list = self._crop_tensorified_examples(all_samples_list)
 
-        # collate into tensors
-        batch = self.collator(all_samples_list)
+            # collate into tensors
+            batch = self.collator(all_samples_list)
 
-        yield batch
+            yield batch
 
     def find_hard_samples_for_random_samples(self, random_samples, n_random_samples, n_hard_samples):
         # it is slightly easier and way less buggy to just accept n_random_samples as an argument
