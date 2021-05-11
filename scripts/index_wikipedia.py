@@ -25,12 +25,15 @@ import argparse
 import logging
 import os
 import sys
+from timeit import timeit
 
 import torch
 import datasets
 import faiss
+import numpy as np
 from sentence_transformers import SentenceTransformer
 torch.set_grad_enabled(False)
+np.random.seed(42)
 
 
 logging.basicConfig(
@@ -117,5 +120,14 @@ if __name__ == '__main__':
         index_save_path = f"{args.save_to}_{args.index_str}.faiss"
 
     data["train"].save_faiss_index("text_emb", index_save_path)
+
+    logger.info("Benchmarking the speed")
+
+    def benchmark_fn():
+        random_vector = np.random.randn(768).astype(np.float32)
+        data["train"].get_nearest_examples("text_emb", random_vector, k=10)
+
+    benchmark_out = timeit("benchmark_fn()", number=100, globals=globals())
+    logging.info(benchmark_out)
 
     logger.info("Script finished successfully")
