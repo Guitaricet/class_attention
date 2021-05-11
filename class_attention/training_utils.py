@@ -456,7 +456,7 @@ def train_cat_model(
     should_stop_early = False
 
     maybe_progress_bar = lambda x: x
-    if len(train_dataloader.dataset) > 100_000:
+    if len(train_dataloader) > 10_000:
         maybe_progress_bar = partial(tqdm, total=len(train_dataloader))
 
     for epoch in tqdm(range(max_epochs), desc="Epochs"):
