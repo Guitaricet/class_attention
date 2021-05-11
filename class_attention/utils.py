@@ -284,3 +284,16 @@ def get_difference(t1, t2):
 
     difference = t1[~sim_index]
     return difference
+
+
+def batch_to_html(text_ids, label_ids, targets, text_tokenizer, label_tokenizer):
+    aligned_labels = label_ids.index_select(0, targets)
+
+    x_text = text_tokenizer.batch_decode(text_ids, skip_special_tokens=True)
+    c_text = label_tokenizer.batch_decode(aligned_labels, skip_special_tokens=True)
+
+    x_text = "".join(f"\n\n\t{i}:" + t for i, t in enumerate(x_text))
+    c_text = "".join(f"\n\t{i}:" + t for i, t in enumerate(c_text))
+
+    batch_html = "<h1> Text batch </h1>\n" + monospace_html(x_text) + "<h1> Label batch </h1>" + monospace_html(c_text)
+    return batch_html

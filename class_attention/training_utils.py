@@ -230,7 +230,9 @@ def prepare_dataloaders(
             )
 
         else:
-            logger.info("Using hard negatives sampling. One epoch will take much longer to compute.")
+            logger.info(
+                "Using hard negatives sampling. One epoch will take much longer to compute."
+            )
             reduced_train_set.load_faiss_index(index_name=index_field, file=faiss_index_path)
 
             reduced_train_dataset = cat.hard_negatives.HardNegativeDatasetWAug(
@@ -461,6 +463,19 @@ def train_cat_model(
             break
 
         for x, c, y in maybe_progress_bar(train_dataloader):
+            if global_step == -1 and wandb.run is not None:
+                # fmt: off
+                batch_html = cat.utils.batch_to_html(
+                    text_ids=x,
+                    label_ids=c,
+                    targets=y,
+                    text_tokenizer=train_dataloader.dataset.text_tokenizer,
+                    label_tokenizer=train_dataloader.dataset.label_tokenizer,
+                )
+                logger.info("The first batch text is uploaded to wandb under `first_batch` key, look it up")
+                wandb.log({"first_batch": wandb.Html(batch_html)})
+                # fmt: on
+
             if c.shape[0] < 2:
                 logger.warning(f"Number of possible classes is {c.shape[0]}, skipping this batch")
                 continue

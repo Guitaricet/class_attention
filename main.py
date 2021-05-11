@@ -212,6 +212,10 @@ def parse_args(args=None):
         args.no_bias = checkpoint_args["no_bias"]
         args.random_cls_vectors = checkpoint_args["random_cls_vectors"]
 
+    if args.faiss_index_path is not None:
+        if not os.path.exists(args.faiss_index_path):
+            raise ValueError(f"--faiss-index-path does not exist. Path provided: {args.faiss_index_path}")
+
     return args
 
 
