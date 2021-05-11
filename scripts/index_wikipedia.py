@@ -74,7 +74,7 @@ def parse_args(args=None):
 if __name__ == '__main__':
     args = parse_args()
 
-    data_save_path = args.save_to or (args.dataset + args.model + "_encoded")
+    data_save_path = args.save_to or (args.dataset + "_" + args.model + "_encoded")
 
     if os.path.exists(data_save_path):
         logger.info(f"The data is already encoded at {data_save_path}. "
