@@ -98,7 +98,7 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
 
             random_samples_list = self._dataset_dict_to_tuples(random_samples)
             hard_samples_list = self._flatten_batched_knn_results(
-                hard_samples_batch, max_len=n_hard_samples, remove_first=True
+                hard_samples_batch, max_batch_size=n_hard_samples, remove_first=True
             )
 
             all_samples_list = random_samples_list + hard_samples_list
@@ -117,18 +117,18 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
         # than to compute it form random_samples
 
         # a minimum integer k neighbors to find enough hard samples given n_random_samples
-        # one extra is the query itself. It is removed in _flatten_batched_knn_results(..., remove_first=True)
-        knn_k = ceil(n_random_samples / n_hard_samples) + 1
+        knn_k = ceil(n_hard_samples / n_random_samples)
 
         # number of randomly sampled examples that will receive hard samples
         # n_queries < n_random_samples to minimize the number of KNN calls
-        n_queries = max(1, floor(n_hard_samples / knn_k))
+        n_queries = ceil(n_hard_samples / knn_k)
 
         # FAISS that is used for KNN requires float32 and default numpy float is 64-bit
         query_embeds = np.array(random_samples[self.index_field][:n_queries], dtype=np.float32)
 
-        hard_samples_batch = self.dataset.get_nearest_examples_batch(
-            index_name=self.index_field, queries=query_embeds, k=knn_k
+        # one extra neighbour the query itself. It is removed in _flatten_batched_knn_results(..., remove_first=True)
+        scores, hard_samples_batch = self.dataset.get_nearest_examples_batch(
+            index_name=self.index_field, queries=query_embeds, k=knn_k + 1
         )
         return hard_samples_batch
 
@@ -141,12 +141,25 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
 
     def _flatten_batched_knn_results(
         self,
-        results: datasets.search.BatchedNearestExamplesResults,
-        max_len=None,
+        batch_of_examples,
+        max_batch_size=None,
         remove_first=False,
     ):
-        batch_of_scores, batch_of_examples = results
+        """Reformats the examples returned by the get_nearest_examples_batch into a list of tuples
+        List[(text_ids, label_ids)] where text_ids and label_ids are python lists.
 
+        Args:
+            batch_of_examples: list of dicts,
+                length of the list equals to the number of queries used to find the batch of examples
+                each dict contains keys from the dataset including text_ids_field and label_ids_field
+                each value is a list of length k where k is the KNN's number of neighbors
+            max_batch_size: instead of batch returns batch[:max_batch_size], used to guarantee that the batch is
+                smaller than this number and the network won't go OOM
+            remove_first: remove the first knn element which is equal to its query
+
+        Returns:
+            List[(text_ids, label_ids)], same as _dataset_dict_to_tuples
+        """
         all_examples = []
         for examples_dict in batch_of_examples:
             # we start at the element 1, because element 0 is exactly a text from random_samples
@@ -155,8 +168,8 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
                 examples_list = examples_list[1:]
             all_examples.extend(examples_list)
 
-        if max_len is not None:
-            all_examples = all_examples[:max_len]
+        if max_batch_size is not None:
+            all_examples = all_examples[:max_batch_size]
 
         return all_examples
 
