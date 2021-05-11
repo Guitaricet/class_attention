@@ -53,6 +53,8 @@ def parse_args(args=None):
                         help="path to a faiss index for the --dataset, use scripts/index_wikipedia.py to produce it")
     parser.add_argument("--index-field", default="text_emb", type=str,
                         help="dataset field name that is associated with the faiss index")
+    parser.add_argument("--percent-hard", default=0.5, type=float,
+                        help="ratio of hard examples in the batch, between 0 and 1")
 
     # Fine-tuning
     parser.add_argument("--load-from-checkpoint", default=None, type=str,
@@ -251,6 +253,7 @@ def main(args):
         verbose=True,
         faiss_index_path=args.faiss_index_path,
         index_field=args.index_field,
+        percent_hard=args.percent_hard,
     )
 
     wandb.config.update(

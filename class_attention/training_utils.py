@@ -144,6 +144,7 @@ def prepare_dataloaders(
     max_text_length=512,
     faiss_index_path=None,
     index_field=None,
+    percent_hard=None,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -166,6 +167,9 @@ def prepare_dataloaders(
             all_classes_str is a full list of class string representations (e.g., ["science", "sport", "politics"]
             test_classes_str has the same format as all_classes_str, but only contains zero-shot classes
     """
+    if faiss_index_path is not None and percent_hard is None:
+        raise ValueError()
+
     if text_field is None or class_field is None:
         raise ValueError("text_field and class_field are required")
 
@@ -244,6 +248,7 @@ def prepare_dataloaders(
                 index_field=index_field,
                 collator=cat.CatCollator(pad_token_id=text_tokenizer.pad_token_id),
                 max_text_len=max_text_length,
+                percent_hard=percent_hard,
             )
 
         ranking_test_dataset = cat.PreprocessedCatDatasetWCropAug(
