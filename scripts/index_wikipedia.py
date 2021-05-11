@@ -89,7 +89,7 @@ if __name__ == '__main__':
         data = datasets.load_from_disk(args.dataset)
 
         def embed(texts):
-            return model.encode(texts, batch_size=args.batch_size)
+            return model.encode(texts, batch_size=args.batch_size, show_progress_bar=False)
 
         def map_fn(x):
             return {"text_emb": embed(x["text"])}
