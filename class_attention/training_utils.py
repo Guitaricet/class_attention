@@ -243,6 +243,7 @@ def prepare_dataloaders(
                 tokenizer=text_tokenizer,
                 index_field=index_field,
                 collator=cat.CatCollator(pad_token_id=text_tokenizer.pad_token_id),
+                max_text_len=max_text_length,
             )
 
         ranking_test_dataset = cat.PreprocessedCatDatasetWCropAug(
