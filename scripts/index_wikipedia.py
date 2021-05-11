@@ -103,7 +103,7 @@ if __name__ == '__main__':
     logger.info("Training index")
     data["train"].add_faiss_index(
         column="text_emb",
-        string_factory=INDEX_STR,
+        string_factory=args.index_str,
         train_size=args.train_size,
         metric_type=faiss.METRIC_INNER_PRODUCT,
         device=args.device,
