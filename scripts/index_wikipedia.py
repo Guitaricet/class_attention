@@ -23,6 +23,7 @@ logging.getLogger("wandb.sdk.internal.internal").setLevel(logging.WARNING)
 MODEL = "nli-distilroberta-base-v2"
 INDEX_STR = "OPQ64_128,IVF8192,PQ64"
 
+
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
 
@@ -50,23 +51,29 @@ def parse_args(args=None):
 if __name__ == '__main__':
     args = parse_args()
 
-    logger.info("Loading the model")
-    model = SentenceTransformer(args.model)
+    data_save_path = args.save_to or (args.dataset + args.model + "_encoded")
 
-    logger.info("Loading the data")
-    data = datasets.load_from_disk(args.dataset)
+    if os.path.exists(data_save_path):
+        data = datasets.load_from_disk(data_save_path)
 
-    def embed(texts):
-        return model.encode(texts, batch_size=args.batch_size)
+    else:
+        logger.info("Loading the model")
+        model = SentenceTransformer(args.model)
 
-    def map_fn(x):
-        return {"text_emb": embed(x["text"])}
+        logger.info("Loading the data")
+        data = datasets.load_from_disk(args.dataset)
 
-    logger.info("Encoding")
-    data["train"] = data["train"].map(map_fn, batched=True, batch_size=args.batch_size)
+        def embed(texts):
+            return model.encode(texts, batch_size=args.batch_size)
 
-    logger.info("Saving data to disk")
-    data.save_to_disk(args.dataset + args.model + "_encoded")
+        def map_fn(x):
+            return {"text_emb": embed(x["text"])}
+
+        logger.info("Encoding")
+        data["train"] = data["train"].map(map_fn, batched=True)
+
+        logger.info("Saving data to disk")
+        data.save_to_disk(data_save_path)
 
     # Index choice:
     # transform = "OPQ"
@@ -100,6 +107,11 @@ if __name__ == '__main__':
     )
 
     logger.info("Saving index")
-    data["train"].save_faiss_index("text_emb", f"{args.dataset}_{args.model}_{args.index_str}.faiss")
+
+    index_save_path = f"{args.dataset}_{args.model}_{args.index_str}.faiss"
+    if args.save_to is not None:
+        index_save_path = f"{args.save_to}_{args.index_str}.faiss"
+
+    data["train"].save_faiss_index("text_emb", index_save_path)
 
     logger.info("Script finished successfully")
