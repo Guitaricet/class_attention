@@ -97,7 +97,9 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
             )
 
             random_samples_list = self._dataset_dict_to_tuples(random_samples)
-            hard_samples_list = self._flatten_batched_knn_results(hard_samples_batch, max_len=n_hard_samples)
+            hard_samples_list = self._flatten_batched_knn_results(
+                hard_samples_batch, max_len=n_hard_samples, remove_first=True
+            )
 
             all_samples_list = random_samples_list + hard_samples_list
             all_samples_list = self._tensorify_examples(all_samples_list)
@@ -108,12 +110,15 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
 
             yield batch
 
-    def find_hard_samples_for_random_samples(self, random_samples, n_random_samples, n_hard_samples):
+    def find_hard_samples_for_random_samples(
+        self, random_samples, n_random_samples, n_hard_samples,
+    ):
         # it is slightly easier and way less buggy to just accept n_random_samples as an argument
         # than to compute it form random_samples
 
         # a minimum integer k neighbors to find enough hard samples given n_random_samples
-        knn_k = ceil(n_random_samples / n_hard_samples)
+        # one extra is the query itself. It is removed in _flatten_batched_knn_results(..., remove_first=True)
+        knn_k = ceil(n_random_samples / n_hard_samples) + 1
 
         # number of randomly sampled examples that will receive hard samples
         # n_queries < n_random_samples to minimize the number of KNN calls
@@ -135,7 +140,10 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
         return list(zip(dataset_dict[self.text_ids_field], dataset_dict[self.label_ids_field]))
 
     def _flatten_batched_knn_results(
-        self, results: datasets.search.BatchedNearestExamplesResults, max_len=None
+        self,
+        results: datasets.search.BatchedNearestExamplesResults,
+        max_len=None,
+        remove_first=False,
     ):
         batch_of_scores, batch_of_examples = results
 
@@ -143,6 +151,8 @@ class HardNegativeDatasetWAug(torch.utils.data.IterableDataset):
         for examples_dict in batch_of_examples:
             # we start at the element 1, because element 0 is exactly a text from random_samples
             examples_list = self._dataset_dict_to_tuples(examples_dict)
+            if remove_first:
+                examples_list = examples_list[1:]
             all_examples.extend(examples_list)
 
         if max_len is not None:
