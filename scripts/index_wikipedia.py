@@ -47,7 +47,7 @@ logging.getLogger("transformers.configuration_utils").setLevel(logging.WARNING)
 logging.getLogger("wandb.sdk.internal.internal").setLevel(logging.WARNING)
 
 MODEL = "nli-distilroberta-base-v2"
-INDEX_STR = "OPQ64_128,IVF8192,PQ64"  # PQ64 does not work on 1080TI, because it does not have enough shared memory
+INDEX_STR = "OPQ64_128,IVF8192,PQ32"  # PQ64 does not work on 1080TI, because it does not have enough shared memory
 
 
 def parse_args(args=None):
@@ -119,6 +119,10 @@ if __name__ == '__main__':
     if args.save_to is not None:
         index_save_path = f"{args.save_to}_{args.index_str}.faiss"
 
+    # workaround for https://github.com/huggingface/datasets/issues/2350
+    if args.device is not None:
+        data["train"]._indexes["text_emb"].faiss_index = faiss.index_gpu_to_cpu(data["train"]._indexes["text_emb"].faiss_index)
+
     data["train"].save_faiss_index("text_emb", index_save_path)
 
     logger.info("Benchmarking the speed")
@@ -128,6 +132,6 @@ if __name__ == '__main__':
         data["train"].get_nearest_examples("text_emb", random_vector, k=10)
 
     benchmark_out = timeit("benchmark_fn()", number=100, globals=globals())
-    logging.info(benchmark_out)
+    logger.info(benchmark_out)
 
     logger.info("Script finished successfully")
