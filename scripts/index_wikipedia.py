@@ -86,7 +86,11 @@ if __name__ == '__main__':
 
     else:
         logger.info("Loading the model")
-        model = SentenceTransformer(args.model)
+        device = None
+        if args.device is not None:
+            device = f"cuda:{args.device}"
+
+        model = SentenceTransformer(args.model, device=device)
 
         logger.info("Loading the data")
         data = datasets.load_from_disk(args.dataset)
