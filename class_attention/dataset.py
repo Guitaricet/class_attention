@@ -125,6 +125,9 @@ class PreprocessedCatDatasetWCropAug(torch.utils.data.Dataset):
         return len(self.dataset)
 
     def __getitem__(self, idx):
+        # TODO: figure out why idx can be np.int64 when using exp replay
+        idx = int(idx)
+
         item = self.dataset[idx]
 
         text_ids = torch.tensor(item[self.text_field])
