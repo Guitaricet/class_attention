@@ -39,22 +39,30 @@ def parse_args(args=None):
                              "Use this option if you pretrain on a ranking task (wiki) and evaluate on a "
                              "classification task (news-category/0shot-tc)")
     parser.add_argument("--test-class-frac", default=0.0, type=float,
-                        help="a fraction of classes to remove from the training set (and use for zero-shot)")
+                        help="A fraction of classes to remove from the training set (and use for zero-shot)")
     parser.add_argument("--dataset-frac", default=1.0, type=float,
-                        help="a fraction of dataset to train and evaluate on, used for debugging")
+                        help="A fraction of dataset to train and evaluate on, used for debugging")
+    parser.add_argument("--experience-replay-dataset", default=None,
+                        help="A path to a dataset")
+    parser.add_argument("--percent-replay-data", default=0.1, type=float,
+                        help="A fraction replay data in the training dataset")
+
     parser.add_argument("--text-field", default=None, type=str)
     parser.add_argument("--class-field", default=None, type=str)
     parser.add_argument("--test-text-field", default=None, type=str)
     parser.add_argument("--test-class-field", default=None, type=str)
+    parser.add_argument("--replay-text-field", default=None, type=str)
+    parser.add_argument("--replay-class-field", default=None, type=str)
+
     parser.add_argument("--max-text-length", default=512, type=int)
     parser.add_argument("--evaluate-on", default="validation", type=str,
-                        help="a split name to evaluate the model on")
+                        help="A split name to evaluate the model on")
     parser.add_argument("--faiss-index-path", default=None, type=str,
-                        help="path to a faiss index for the --dataset, use scripts/index_wikipedia.py to produce it")
+                        help="Path to a faiss index for the --dataset, use scripts/index_wikipedia.py to produce it")
     parser.add_argument("--index-field", default="text_emb", type=str,
-                        help="dataset field name that is associated with the faiss index")
+                        help="Dataset field name that is associated with the faiss index")
     parser.add_argument("--percent-hard", default=0.5, type=float,
-                        help="ratio of hard examples in the batch, between 0 and 1")
+                        help="Ratio of hard examples in the batch, between 0 and 1")
 
     # Fine-tuning
     parser.add_argument("--load-from-checkpoint", default=None, type=str,
@@ -152,17 +160,13 @@ def parse_args(args=None):
     args = parser.parse_args(args)
     args.tags = args.tags.split(",") if args.tags else []
 
-    # fmt: on
-
     args.use_bias = not args.no_bias
 
     if args.debug:
         if args.save_to is not None:
             raise ValueError("--save-to is not supported in debug mode")
 
-        logger.info(
-            "Running in a debug mode, overriding dataset, tags, max_epochs, dataset_frac, and test_class_frac args"
-        )
+        logger.info("Running in a debug mode, overriding dataset, tags, max_epochs, dataset_frac, and test_class_frac args")
         args.dataset = DATASET
         args.dataset_frac = 0.001
         args.test_class_frac = 0.2
@@ -174,6 +178,10 @@ def parse_args(args=None):
 
     if args.random_cls_vectors is not None and args.hidden_size is None:
         raise ValueError("you should provide --hidden-size with --random-cls-vectors")
+
+    if args.experience_replay_dataset is not None and args.faiss_index_path is not None:
+        raise ValueError("experience replay with hard negative sampling is not supported "
+                         "[and probably does not make sense]")
 
     if args.discr_lr is None and args.discriminator_update_freq is not None:
         args.discr_lr = args.lr
@@ -193,10 +201,12 @@ def parse_args(args=None):
         args.test_text_field = args.test_text_field or args.text_field
         args.test_class_field = args.test_class_field or args.class_field
 
+    if args.experience_replay_dataset is not None:
+        if args.replay_class_field is None or args.replay_text_field is None:
+            raise ValueError("--replay-class-field and --replay-text-field should be both specified")
+
     if args.load_from_checkpoint:
-        logger.info(
-            "Architecture arguments provided to the script are ignored in case of --finetune-cat-model"
-        )
+        logger.info("Architecture arguments provided to the script are ignored in case of --finetune-cat-model")
         logger.info("Loading architecture arguments form the checkpoint")
         checkpoint_args = torch.load(args.load_from_checkpoint, map_location="cpu")["model_args"]
 
@@ -218,6 +228,7 @@ def parse_args(args=None):
         if not os.path.exists(args.faiss_index_path):
             raise ValueError(f"--faiss-index-path does not exist. Path provided: {args.faiss_index_path}")
 
+    # fmt: on
     return args
 
 
@@ -254,6 +265,10 @@ def main(args):
         faiss_index_path=args.faiss_index_path,
         index_field=args.index_field,
         percent_hard=args.percent_hard,
+        experience_replay_dataset_name_or_path=args.experience_replay_dataset,
+        replay_text_field=args.replay_text_field,
+        replay_class_field=args.replay_class_field,
+        percent_replay_data=args.percent_replay_data,
     )
 
     wandb.config.update(

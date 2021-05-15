@@ -1,5 +1,7 @@
 import pytest
 import datasets
+import torch.utils.data
+
 import class_attention as cat
 
 
@@ -54,3 +56,34 @@ def test_getitem_wcrop():
     assert len(y.shape) == 1
     assert x[0] == 1  # first token should remain
     assert x[-1] == 100  # last token should remain
+
+
+def test_concat_sample():
+    hidden = 11
+    d1_size, d2_size = 1000, 1000
+    concat_ds = torch.utils.data.TensorDataset(torch.zeros(d1_size, hidden))
+    sample_ds = torch.utils.data.TensorDataset(torch.ones(d2_size, hidden))
+
+    common_ds_0 = cat.dataset.SampleConcatSubset(concat_ds, sample_ds, sample_probability=0.0)
+    assert common_ds_0._sample_dataset_amount == 0
+
+    checksum = 0
+    for item in common_ds_0:
+        checksum += item[0][0]
+    assert checksum.item() == 0
+    del common_ds_0
+
+    common_ds_01 = cat.dataset.SampleConcatSubset(concat_ds, sample_ds, sample_probability=0.1)
+    checksum = 0
+    for item in common_ds_01:
+        checksum += item[0][0]
+
+    assert round(checksum.item() / len(common_ds_01), 2) == 0.1
+    del common_ds_01
+
+    common_ds_05 = cat.dataset.SampleConcatSubset(concat_ds, sample_ds, sample_probability=0.5)
+    checksum = 0
+    for item in common_ds_05:
+        checksum += item[0][0]
+
+    assert round(checksum.item() / len(common_ds_05), 2) == 0.5

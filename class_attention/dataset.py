@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.utils.data
 import tokenizers
@@ -158,3 +159,74 @@ class PreprocessedCatDatasetWCropAug(torch.utils.data.Dataset):
             ]
         )
         return cropped_sequence
+
+
+class SampleConcatSubset(torch.utils.data.Dataset):
+    # https://github.com/googleinterns/new-semantic-parsing
+    # Copyright 2020 Google LLC
+    #
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #
+    #     https://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+    # =============================================================================
+    # modified in such a way that sample_probability is the probability of sampling
+    # an element from sample_dataset
+    def __init__(self, concat_dataset, sample_dataset, sample_probability):
+        """Implements concatenation of concat_dataset and a subset of sample_dataset.
+
+
+        Args:
+            concat_dataset: torch Dataset
+            sample_dataset: torch Dataset
+            sample_probability: float, 0 < sample_probability < 1
+        """
+
+        self._concat_dataset = concat_dataset
+        self._sample_dataset = sample_dataset
+        self._sample_probability = sample_probability
+
+        p = sample_probability
+        self._sample_dataset_amount = int(p * len(concat_dataset) / (1 - p))
+
+        if self._sample_dataset_amount > len(self._sample_dataset):
+            raise NotImplementedError()
+
+        self._data = None
+        self.resample()
+
+    def __len__(self):
+        if self._data is None:
+            raise RuntimeError("Call .resample first")
+        return len(self._data)
+
+    def resample(self):
+        """Resamples from sample_dataset, inplace
+
+        Returns:
+            torch Dataset
+        """
+        subset = self.make_subset(self._sample_dataset, self._sample_dataset_amount)
+        self._data = torch.utils.data.ConcatDataset([self._concat_dataset, subset])
+        return self._data
+
+    def __getitem__(self, item):
+        return self._data[item]
+
+    @staticmethod
+    def make_subset(dataset, subset_size):
+        """Makes torch Subset by randomly sampling indices from dataset
+        Args:
+            dataset: torch Dataset
+            subset_size: int, size of the final dataset
+        """
+        _subset_ids = np.random.permutation(len(dataset))[:subset_size]
+        _subset = torch.utils.data.Subset(dataset, indices=_subset_ids)
+        return _subset

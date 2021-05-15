@@ -145,6 +145,10 @@ def prepare_dataloaders(
     faiss_index_path=None,
     index_field=None,
     percent_hard=None,
+    experience_replay_dataset_name_or_path=None,
+    replay_text_field=None,
+    replay_class_field=None,
+    percent_replay_data=None,
 ) -> (DataLoader, DataLoader, list, list, dict):
     """Loads dataset with zero-shot classes, creates collators and dataloaders
 
@@ -167,6 +171,15 @@ def prepare_dataloaders(
             all_classes_str is a full list of class string representations (e.g., ["science", "sport", "politics"]
             test_classes_str has the same format as all_classes_str, but only contains zero-shot classes
     """
+    # input validation
+    if experience_replay_dataset_name_or_path is not None:
+        if replay_text_field is None:
+            raise ValueError()
+        if replay_class_field is None:
+            raise ValueError()
+        if percent_replay_data is None:
+            raise ValueError()
+
     if faiss_index_path is not None and percent_hard is None:
         raise ValueError()
 
@@ -184,6 +197,8 @@ def prepare_dataloaders(
 
     test_text_field = test_text_field or text_field
     test_class_field = test_class_field or class_field
+
+    # end of input validation
 
     if verbose:
         logger.info("Preparing training set")
@@ -217,7 +232,7 @@ def prepare_dataloaders(
     text_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, fast=True)
     label_tokenizer = text_tokenizer  # legacy stuff
 
-    # Datasets
+    # torch.Dataset objects
     if "ids" in text_field:  # means the dataset is preprocessed
         if verbose:
             logger.info(
@@ -225,6 +240,7 @@ def prepare_dataloaders(
             )
 
         if faiss_index_path is None:
+            # regular case
             reduced_train_dataset = cat.PreprocessedCatDatasetWCropAug(
                 dataset=reduced_train_set,
                 text_field=text_field,
@@ -234,6 +250,7 @@ def prepare_dataloaders(
             )
 
         else:
+            # hard negatives using FAISS case
             logger.info(
                 "Using hard negatives sampling. One epoch will take much longer to compute."
             )
@@ -261,6 +278,9 @@ def prepare_dataloaders(
         )
 
     else:
+        if faiss_index_path is not None:
+            raise NotImplementedError("FAISS indexing is only supported in preprocessed datasets")
+
         if verbose:
             logger.info("The training dataset is raw text, creating CatDataset object")
 
@@ -274,6 +294,30 @@ def prepare_dataloaders(
 
     if "ids" in test_text_field:
         raise NotImplementedError()
+
+    if experience_replay_dataset_name_or_path is not None:
+        logger.info("Loading experience replay dataset")
+        # replace train_dataset with a new one that contains extra examples
+        replay_dataset_dict = cat.utils.get_dataset_by_name_or_path(experience_replay_dataset_name_or_path)
+        replay_dataset_str = replay_dataset_dict["train"]
+
+        # TODO: cleanup dirty code
+        if "ids" not in replay_text_field or "ids" not in replay_class_field:
+            raise ValueError("replay dataset should be numericalized and its fields should have ids in their names")
+
+        replay_dataset = cat.PreprocessedCatDatasetWCropAug(
+            dataset=replay_dataset_str,
+            text_field=replay_text_field,
+            class_field=replay_class_field,
+            tokenizer=text_tokenizer,
+            max_text_len=max_text_length,
+        )
+
+        reduced_train_dataset = cat.dataset.SampleConcatSubset(
+            concat_dataset=reduced_train_dataset,
+            sample_dataset=replay_dataset,
+            sample_probability=percent_replay_data,
+        )
 
     if verbose:
         logger.info("Creating CatDataset object for the test set")

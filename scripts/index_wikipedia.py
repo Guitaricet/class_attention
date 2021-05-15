@@ -107,7 +107,7 @@ if __name__ == '__main__':
         logger.info("Saving data to disk")
         data.save_to_disk(data_save_path)
 
-    logger.info("Training index (takes 20 minutes for a Wikipedia-sized dataset_")
+    logger.info("Training index (takes 20 minutes for a Wikipedia-sized dataset)")
     data["train"].add_faiss_index(
         column="text_emb",
         string_factory=args.index_str,
