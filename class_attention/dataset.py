@@ -195,6 +195,8 @@ class SampleConcatSubset(torch.utils.data.Dataset):
         self._concat_dataset = concat_dataset
         self._sample_dataset = sample_dataset
         self._sample_probability = sample_probability
+        self.text_tokenizer = self.label_tokenizer = concat_dataset.text_tokenizer
+        self.max_text_len = concat_dataset.max_text_len
 
         p = sample_probability
         self._sample_dataset_amount = int(p * len(concat_dataset) / (1 - p))
