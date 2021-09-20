@@ -142,6 +142,8 @@ def parse_args(args=None):
     # Other kinds of regularization
     parser.add_argument("--class-cos2-reg", default=None, type=float,
                         help="Add cos^2 between class embeddings to the loss, weight by this value")
+    parser.add_argument("--final-hidden-l2-reg", default=None, type=float,
+                        help="Add L2 penalty to the final representations of classes and instances with this weight")
 
     # --- Misc
     parser.add_argument("--fp16", default=False, action="store_true")
@@ -378,6 +380,7 @@ def main(args):
         adv_reg_weight=args.adv_reg_weight,
         use_wasserstein_loss=args.wasserstein,
         ranking_test_dataloader=ranking_test_dataloader,
+        final_hidden_l2_reg=args.final_hidden_l2_reg,
         **extra_kwargs,
     )
 

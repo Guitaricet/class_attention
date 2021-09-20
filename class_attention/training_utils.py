@@ -458,6 +458,7 @@ def train_cat_model(
     adv_reg_weight=1.0,
     use_wasserstein_loss=False,
     ranking_test_dataloader=None,
+    final_hidden_l2_reg=None,
 ):
     _check_discriminator_triplet(discriminator, discriminator_optimizer, discriminator_update_freq)
 
@@ -800,6 +801,7 @@ def get_model_loss(
     extra_examples_dataloader=None,
     examples_entropy_reg=None,
     class_vec_cos_reg=None,
+    final_hidden_l2_reg=None,
 ):
     """
     Computes a single forward step for the model (not the discriminator).
@@ -880,6 +882,16 @@ def get_model_loss(
 
     if class_vec_cos_reg is not None:
         total_loss += class_vec_cos_reg * cos2
+
+    # L2 regularization of h_x and h_c
+    example_l2 = torch.sum(torch.norm(h_x, dim=-1))
+    class_l2 = torch.sum(torch.norm(h_c, dim=-1))
+
+    extra_metrics["train/example_l2"] = example_l2
+    extra_metrics["train/class_l2"] = class_l2
+
+    if final_hidden_l2_reg is not None:
+        total_loss += (example_l2 + class_l2) * final_hidden_l2_reg
 
     metrics = {
         "train/acc": acc,
